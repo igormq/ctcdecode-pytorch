@@ -1,10 +1,9 @@
-import multiprocessing
-
 import math
 import numpy as np
 import torch
 
 from .beams import Beams
+
 
 def logcumsumexp(x, dim=0):
     m, _ = x.max(dim=dim, keepdim=True)
@@ -39,12 +38,7 @@ def ctc_greedy_decoder(log_probs_seq, blank=0):
 
 
 @torch.no_grad()
-def ctc_beam_search_decoder(log_probs_seq,
-                            lm_scorer=None,
-                            beam_size=100,
-                            blank=0,
-                            cutoff_prob=1.0,
-                            cutoff_top_n=None):
+def ctc_beam_search_decoder(log_probs_seq, lm_scorer=None, beam_size=100, blank=0, cutoff_prob=1.0, cutoff_top_n=None):
     """
     Performs prefix beam search on the output of a CTC network.
 
@@ -65,24 +59,26 @@ def ctc_beam_search_decoder(log_probs_seq,
     log_cutoff_prob = math.log(cutoff_prob)
     cutoff_top_n = min(cutoff_top_n, V) if cutoff_top_n else V
 
-    beams = Beams()
+    beams = Beams(is_valid=lm_scorer.is_valid if lm_scorer else None)
 
     for t in range(T):
 
         log_probs = log_probs_seq[t]
 
+        curr_beams = list(beams.items())
+
         # A default dictionary to store the next step candidates.
-        curr_beams = beams.sort()
         num_prefixes = len(curr_beams)
 
-        min_cutoff = curr_beams[-1][1].score_ctc + log_probs[blank]
+        # min_cutoff = curr_beams[-1][-1]['score_ctc'] + log_probs[blank]
+
+        min_cutoff = curr_beams[-1][-1].score_ctc + log_probs[blank]
 
         # Prunning step
         pruned_indexes = torch.arange(len(log_probs)).tolist()
         if log_cutoff_prob < 0.0 or cutoff_top_n < V:
             idxs = torch.argsort(log_probs, descending=True)
-            n_idxs = min(
-                (logcumsumexp(log_probs[idxs], 0) <= log_cutoff_prob).sum(), cutoff_top_n, V)
+            n_idxs = min((logcumsumexp(log_probs[idxs], 0) <= log_cutoff_prob).sum(), cutoff_top_n, V)
             pruned_indexes = idxs[:n_idxs].tolist()
 
         for token_index in pruned_indexes:
@@ -93,33 +89,38 @@ def ctc_beam_search_decoder(log_probs_seq,
             # probabilities for the prefix given that it ends in a
             # blank and does not end in a blank at this time step.
             for prefix, beam in curr_beams:
+                # p_b, p_nb = beam['p_b'], beam['p_nb']
                 p_b, p_nb = beam.p_b, beam.p_nb
 
+                # if (num_prefixes == beam_size) and p + beam['score_ctc'] < min_cutoff:
                 if (num_prefixes == beam_size) and p + beam.score_ctc < min_cutoff:
                     break
 
                 # If we propose a blank the prefix doesn't change. Only the probability of ending
                 # in blank gets updated.
                 if token_index == blank:
+                    # beam['n_p_b'] = np.logaddexp(beam['n_p_b'], beam['score_ctc'] + p)
                     beam.n_p_b = np.logaddexp(beam.n_p_b, beam.score_ctc + p)
                     continue
 
-                # Extend the prefix by the new character s and add it to the beam. Only the
+                # Extend the prefix by the new character s and add it to the beam[' Only'] the
                 # probability of not ending in blank gets updated.
                 last_token_index = prefix[-1] if prefix else None
 
                 if token_index == last_token_index:
                     # If s is repeated at the end we also update the unchanged prefix. This is the
                     # merging case.
+                    # beam['n_p_nb'] = np.logaddexp(beam['n_p_nb'], p_nb + p)
                     beam.n_p_nb = np.logaddexp(beam.n_p_nb, p_nb + p)
 
                 n_prefix = prefix + (token_index, )
 
                 # Must update state for prefix search
-                n_beam = beams.get(n_prefix, t, is_valid=lm_scorer.is_valid if lm_scorer else None)
+                n_beam = beams.getitem(n_prefix, previous_beam=beam)
                 if not n_beam:
                     continue
 
+                # n_p_b, n_p_nb = n_beam['n_p_b'], n_beam['n_p_nb']
                 n_p_b, n_p_nb = n_beam.n_p_b, n_beam.n_p_nb
 
                 if token_index == last_token_index and p_b > -float('inf'):
@@ -128,13 +129,18 @@ def ctc_beam_search_decoder(log_probs_seq,
                     # separated by a blank.
                     n_p_nb = np.logaddexp(n_p_nb, p_b + p)
                 elif token_index != last_token_index:
+                    # n_p_nb = np.logaddexp(n_p_nb, beam['score_ctc'] + p)
                     n_p_nb = np.logaddexp(n_p_nb, beam.score_ctc + p)
 
                 if lm_scorer:
                     # LM scorer has access and updates the state variable
+                    # p_lm = lm_scorer(n_prefix, n_beam['state'])
+                    # n_beam['score_lm'] = beam['score_lm'] + p_lm
                     p_lm = lm_scorer(n_prefix, n_beam.state)
                     n_beam.score_lm = beam.score_lm + p_lm
 
+                # n_beam['n_p_b'] = n_p_b
+                # n_beam['n_p_nb'] = n_p_nb
                 n_beam.n_p_b = n_p_b
                 n_beam.n_p_nb = n_p_nb
 
@@ -148,8 +154,11 @@ def ctc_beam_search_decoder(log_probs_seq,
     if lm_scorer:
         for prefix, beam in beams.items():
             if prefix:
+                # p_lm = lm_scorer(prefix, beam['state'], eos=True)
+                # beam['score_lm'] += p_lm
                 p_lm = lm_scorer(prefix, beam.state, eos=True)
                 beam.score_lm += p_lm
 
     # Return the top beam_size -log probabilities without the lm scoring
+    # return [(-beam['score_ctc'], p, beam['timesteps']) for p, beam in beams.sort()]
     return [(-beam.score_ctc, p, beam.timesteps) for p, beam in beams.sort()]

@@ -1,69 +1,74 @@
-import torch
+from collections.abc import MutableMapping
+from dataclasses import dataclass
+from operator import itemgetter
+from typing import Tuple
+
 import numpy as np
-from collections import OrderedDict as odict
-import copy
+
+LOG_0 = -float('inf')
+LOG_1 = 0.0
 
 
+@dataclass
 class Beam:
-    def __init__(self, state={}, timesteps=(0,)):
-        self.p_b = self.p_nb = -float('inf')
-        self.n_p_b = self.n_p_nb = -float('inf')
+    p_b: float = LOG_0
+    p_nb: float = LOG_0
 
-        self.score_lm = 0.0
-        self.score_ctc = -float('inf')
+    n_p_b: float = LOG_0
+    n_p_nb: float = LOG_0
 
-        self.state = state
-        self.timesteps = timesteps
+    score: float = LOG_0
+    score_lm: float = LOG_1
+    score_ctc: float = LOG_0
+
+    state = {}
+    timesteps: Tuple = ()
 
     def step(self):
         self.p_b, self.p_nb = self.n_p_b, self.n_p_nb
-        self.n_p_b = self.n_p_nb = -float('inf')
+        self.n_p_b = self.n_p_nb = LOG_0
         self.score_ctc = np.logaddexp(self.p_b, self.p_nb)
-
-    @property
-    def score(self):
-        return self.score_ctc + self.score_lm
-
-    def copy(self, timestep=(0,)):
-        if isinstance(timestep, int):
-            timestep = (timestep, )
-
-        beam = Beam(timesteps=self.timesteps + timestep)
-        beam.state = copy.deepcopy(self.state)
-        return beam
+        self.score = self.score_ctc + self.score_lm
 
     def __repr__(self):
-        return f'Beam(p_b={self.p_b:.4f}, p_nb={self.p_nb:.4f}, score={self.score:.4f})'
+        return (f'Beam(p_b={self.p_b:.4f}, p_nb={self.p_nb:.4f}, ' f'score={self.score:.4f})')
 
 
-class Beams:
-    def __init__(self):
-        self.beams = odict()
-        self.beams[()] = Beam()
+class Beams(MutableMapping):
+    def __init__(self, is_valid=None):
+        self.is_valid = is_valid
+        self.timestep = 0
+
+        self.beams = {(): Beam()}
         self.beams[()].p_b = 0
         self.beams[()].score_ctc = 0.0
 
-    def __getitem__(self, prefix):
-        return self.get(prefix)
+    def __getitem__(self, key):
+        return self.getitem(key)
 
-    def get(self, prefix, timestep=None, is_valid=None):
+    def getitem(self, key, previous_beam=None):
 
-        if prefix in self.beams:
-            return self.beams[prefix]
+        if key in self.beams:
+            return self.beams[key]
 
-        timesteps = (0, )
-        if len(prefix):
-            new_beam = self.beams[prefix[:-1]].copy(timestep=timestep)
-            if is_valid and not is_valid(prefix[-1], new_beam.state):
+        new_beam = Beam()
+
+        if previous_beam:
+            new_beam.timesteps = previous_beam.timesteps + (self.timestep, )
+            new_beam.state = previous_beam.state
+
+            if self.is_valid and not self.is_valid(key[-1], new_beam.state):
                 return None
-        else:
-            new_beam = Beam(timesteps=timesteps)
-        self.beams[prefix] = new_beam
+
+        self.beams[key] = new_beam
 
         return new_beam
 
-    def items(self):
-        return self.beams.items()
+    def __setitem__(self, key, value):
+        self.beams[key] = value
+
+    def __delitem__(self, key):
+        del self.beams[key]
 
     def __len__(self):
         return len(self.beams)
@@ -71,34 +76,24 @@ class Beams:
     def __iter__(self):
         return iter(self.beams)
 
-    def keys(self):
-        return self.beams.keys()
-
-    def values(self):
-        return self.beams.values()
-
     def step(self):
+
         for beam in self.beams.values():
             beam.step()
+
+        self.timestep += 1
 
     def topk_(self, k):
         """ Keep only the top k prefixes """
         if len(self.beams) <= k:
             return self
 
-        beam_scores = torch.as_tensor([beam.score for beam in self.beams.values()])
-        _, indexes = torch.topk(beam_scores, k)
+        beams = list(self.beams.items())
+        indexes = np.argpartition([-v.score for k, v in beams], k)[:k].tolist()
 
-        self.beams = odict((k, v) for i, (k, v) in enumerate(self.beams.items()) if i in indexes)
+        self.beams = {k: v for k, v in itemgetter(*indexes)(beams)}
 
         return self
 
     def sort(self):
-        return sorted(self.beams.items(), key=lambda x: -x[1].score)
-
-
-    def __delitem__(self, key):
-        self.beams.__delitem__(key)
-
-    def __setitem__(self, key, value):
-        self.beams[key] = value
+        return sorted(self.beams.items(), key=lambda x: x[1].score, reverse=True)
