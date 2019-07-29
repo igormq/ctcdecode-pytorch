@@ -143,6 +143,5 @@ class Trie:
 
         return self._arc_iter.value().nextstate
 
-
     def save(self, output_path):
         self.trie.write(output_path)
