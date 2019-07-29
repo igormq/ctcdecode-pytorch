@@ -3,7 +3,7 @@ import os
 import numpy as np
 import copy
 import kenlm
-from ctcdecode.trie import Trie
+from ctcdecode.fst import FST
 
 
 class KenLMScorer:
@@ -18,10 +18,10 @@ class KenLMScorer:
     LOG10_E = np.log10(np.exp(1))
     OOV_SCORE = -1000.0
 
-    def __init__(self, model_path, tokenizer, trie_path=None, alpha=0, beta=0, unit='word', build_trie=False):
+    def __init__(self, model_path, tokenizer, fst_path=None, alpha=0, beta=0, unit='word'):
 
         self.lm = kenlm.Model(model_path)
-        self.trie = None
+        self.fst = None
         self.tokenizer = tokenizer
 
         self.order = self.lm.order
@@ -31,12 +31,10 @@ class KenLMScorer:
 
         self.unit = unit
 
-        self.trie = None
+        self.fst = None
         if self.unit == 'word':
-            if trie_path:
-                self.trie = Trie(trie_path)
-            if build_trie:
-                self.trie = Trie.from_lm(lm, tokenizer)
+            if fst_path:
+                self.fst = FST(fst_path)
 
     def __call__(self, token_ids, state, eos=False):
         """ Evaluation function
@@ -98,24 +96,23 @@ class KenLMScorer:
         # print(self.alpha * total_score / self.LOG10_E + self.beta * len(tokens))
         return self.alpha * score / self.LOG10_E + self.beta
 
-
     def is_valid(self, token, state):
 
-        if not self.trie:
+        if not self.fst:
             return True
 
-        state.setdefault('trie_state', self.trie.initial_state)
+        state.setdefault('fst_state', self.fst.initial_state)
 
-        self.trie.set_state(state['trie_state'])
+        self.fst.set_state(state['fst_state'])
 
-        found = self.trie.find(token)
+        found = self.fst.find(token)
 
         if not found:
             return False
 
-        state['trie_state'] = self.trie.next_state
+        state['fst_state'] = self.fst.next_state
 
-        if self.trie.is_final(state['trie_state']):
-            state['trie_state'] = self.trie.initial_state
+        if self.fst.is_final(state['fst_state']):
+            state['fst_state'] = self.fst.initial_state
 
         return True

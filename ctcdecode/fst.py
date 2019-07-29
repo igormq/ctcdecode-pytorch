@@ -1,5 +1,6 @@
-import openfst_python as fst
+import openfst_python as openfst
 from numba import jit
+
 
 @jit(nopython=True, fastmath=True)
 def binary_search(x, value):
@@ -17,31 +18,31 @@ def binary_search(x, value):
     return low
 
 
-class Trie:
-    TROPICAL_WEIGHT_ONE = fst.Weight.One('tropical')
+class FST:
+    TROPICAL_WEIGHT_ONE = openfst.Weight.One('tropical')
 
-    def __init__(self, trie_path, trie=None):
+    def __init__(self, fst_path, fst=None):
 
-        if not trie:
-            trie = fst.Fst.read(trie_path)
+        if not fst:
+            fst = openfst.Fst.read(fst_path)
 
-        self.trie = trie
+        self.fst = fst
 
-        self._state = fst.NO_STATE_ID
-        self._eps_next_state = self._state = fst.NO_STATE_ID
+        self._state = openfst.NO_STATE_ID
+        self._eps_next_state = self._state = openfst.NO_STATE_ID
 
     @classmethod
     def from_vocab(cls, vocab, tokenizer):
-        trie = fst.Fst()
+        fst = openfst.Fst()
 
         def add_word(word):
             i_words = tokenizer.token2idx(word) + [tokenizer.space_idx]
-            if not trie.num_states():
-                initial_state = trie.add_state()
+            if not fst.num_states():
+                initial_state = fst.add_state()
                 assert initial_state == 0
-                trie.set_start(initial_state)
+                fst.set_start(initial_state)
 
-            source_state = trie.start()
+            source_state = fst.start()
             dest_state = None
             for i in i_words:
                 # The initial state of FST is state 0, hence the index of chars in
@@ -49,11 +50,11 @@ class Trie:
                 # state, otherwise wrong decoding results would be given.
                 i += 1
 
-                dest_state = trie.add_state()
-                trie.add_arc(source_state, fst.Arc(i, i, 0, dest_state))
+                dest_state = fst.add_state()
+                fst.add_arc(source_state, fst.Arc(i, i, 0, dest_state))
                 source_state = dest_state
 
-            trie.set_final(dest_state, fst.Weight.One('tropical'))
+            fst.set_final(dest_state, fst.Weight.One('tropical'))
 
         lexicon_size = 0
         for word in vocab:
@@ -64,26 +65,25 @@ class Trie:
         # These are transitions that don't require a string input to be taken.
         # Getting rid of them is necessary to make the FST determinisitc, but
         # can greatly increase the size of the FST
-        trie.rmepsilon()
+        fst.rmepsilon()
 
         # This makes the FST deterministic, meaning for any string input there's
         # only one possible state the FST could be in.  It is assumed our
         # dictionary is deterministic when using it.
         # (lest we'd have to check for multiple transitions at each state)
-        trie = fst.determinize(trie)
+        fst = fst.determinize(fst)
 
         # Finds the simplest equivalent fst. This is unnecessary but decreases
         # memory usage of the dictionary
-        trie.minimize()
+        fst.minimize()
 
-        return cls(trie_path=None, trie=trie)
-
+        return cls(fst_path=None, fst=fst)
 
     def set_state(self, state):
         if self._state == state:
             return
 
-        self._arc_iter = self.trie.arcs(state)
+        self._arc_iter = self.fst.arcs(state)
         self._state = state
 
         self._eps_next_state = state
@@ -92,7 +92,7 @@ class Trie:
         # openfst index 0 is reserved for eps
         label = label + 1
 
-        label = 0 if label == fst.NO_LABEL else label
+        label = 0 if label == openfst.NO_LABEL else label
 
         self._eps_loop = label == 0
 
@@ -126,11 +126,11 @@ class Trie:
         return False
 
     def is_final(self, state):
-        return self.trie.final(state) == self.TROPICAL_WEIGHT_ONE
+        return self.fst.final(state) == self.TROPICAL_WEIGHT_ONE
 
     @property
     def initial_state(self):
-        return self.trie.start()
+        return self.fst.start()
 
     @property
     def state(self):
@@ -143,6 +143,5 @@ class Trie:
 
         return self._arc_iter.value().nextstate
 
-
     def save(self, output_path):
-        self.trie.write(output_path)
+        self.fst.write(output_path)
