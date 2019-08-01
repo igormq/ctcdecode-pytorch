@@ -1,65 +1,80 @@
-#include "path_trie.h"
-#include "decoder_utils.h"
-#include <torch/extension.h>
-#include <pybind11/stl.h>
-#include <pybind11/stl_bind.h>
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <torch/torch.h>
+#include "scorer.h"
+#include "ctc_beam_search_decoder.h"
 
-
-void prune(std::vector<PathTrie *> &prefixes, int beam_size)
+int beam_decode(at::Tensor log_probs,
+                at::Tensor seq_lengths,
+                const Alphabet &alphabet,
+                int vocab_size,
+                size_t beam_size,
+                size_t num_processes,
+                double cutoff_prob,
+                size_t cutoff_top_n,
+                Scorer *scorer,
+                at::Tensor th_output,
+                at::Tensor th_timesteps,
+                at::Tensor th_scores,
+                at::Tensor th_out_length)
 {
-    if (prefixes.size() >= beam_size)
-    {
-        std::nth_element(prefixes.begin(),
-                         prefixes.begin() + beam_size,
-                         prefixes.end(),
-                         prefix_compare);
-        for (size_t i = beam_size; i < prefixes.size(); ++i)
-        {
-            prefixes[i]->remove();
+    const int64_t max_time = log_probs.size(1);
+    const int64_t batch_size = log_probs.size(0);
+    const int64_t num_classes = log_probs.size(2);
+
+    std::vector<std::vector<std::vector<double>>> inputs;
+    auto prob_accessor = log_probs.accessor<float, 3>();
+    auto seq_len_accessor = seq_lengths.accessor<int, 1>();
+
+    for (int b=0; b < batch_size; ++b) {
+        // avoid a crash by ensuring that an erroneous seq_len doesn't have us try to access memory we shouldn't
+        int seq_len = std::min((int)seq_len_accessor[b], (int)max_time);
+        std::vector<std::vector<double>> temp (seq_len, std::vector<double>(num_classes));
+        for (int t=0; t < seq_len; ++t) {
+            for (int n=0; n < num_classes; ++n) {
+                float val = prob_accessor[b][t][n];
+                temp[t][n] = val;
+            }
         }
-        prefixes.erase(prefixes.begin() + beam_size, prefixes.end());
+        inputs.push_back(temp);
     }
+
+    std::vector<std::vector<std::pair<double, Output>>> batch_results =
+    ctc_beam_search_decoder_batch(prob_accessor, batch_size, 1, 2, seq_len_accessor, batch_size, alphabet, beam_size, num_processes, cutoff_prob, cutoff_top_n, ext_scorer);
+
+    auto outputs_accessor =  th_output.accessor<int, 3>();
+    auto timesteps_accessor =  th_timesteps.accessor<int, 3>();
+    auto scores_accessor =  th_scores.accessor<float, 2>();
+    auto out_length_accessor =  th_out_length.accessor<int, 2>();
+
+
+    for (int b = 0; b < batch_results.size(); ++b){
+        std::vector<std::pair<double, Output>> results = batch_results[b];
+        for (int p = 0; p < results.size();++p){
+            std::pair<double, Output> n_path_result = results[p];
+            Output output = n_path_result.second;
+            std::vector<int> output_tokens = output.tokens;
+            std::vector<int> output_timesteps = output.timesteps;
+            for (int t = 0; t < output_tokens.size(); ++t){
+                outputs_accessor[b][p][t] =  output_tokens[t]; // fill output tokens
+                timesteps_accessor[b][p][t] = output_timesteps[t];
+            }
+            scores_accessor[b][p] = n_path_result.first;
+            out_length_accessor[b][p] = output_tokens.size();
+        }
+    }
+    return 1;
 }
 
-// PYBIND11_MAKE_OPAQUE(std::vector<std::pair<int, PathTrie *>>);
-PYBIND11_MAKE_OPAQUE(std::vector<PathTrie *,std::allocator<PathTrie*> >);
 
-// PYBIND11_MAKE_OPAQUE(std::vector<std::pair<int, PathTrie *>>)
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
-{
-    // py::bind_vector<std::vector<std::pair<int, PathTrie *>> >(m, "TrieTuple");
-    py::bind_vector<std::vector<PathTrie *,std::allocator<PathTrie*>>>(m, "ListTrie");
-    py::class_<PathTrie>(m, "PathTrie")
-        .def(py::init<>())
-        .def("get_path_trie", &PathTrie::get_path_trie, py::return_value_policy::reference)
-        .def("get_path_vec", (PathTrie * (PathTrie::*)(std::vector<int> &, std::vector<int> &)) & PathTrie::get_path_vec, py::return_value_policy::reference)
-        .def("iterate_to_vec", &PathTrie::iterate_to_vec)
-        .def("remove", &PathTrie::remove)
-        .def_readwrite("p_b", &PathTrie::log_prob_b_prev)
-        .def_readwrite("p_nb", &PathTrie::log_prob_nb_prev)
-        .def_readwrite("n_p_b", &PathTrie::log_prob_b_cur)
-        .def_readwrite("n_p_nb", &PathTrie::log_prob_nb_cur)
-        .def_readwrite("score", &PathTrie::score)
-        .def_readwrite("score_ctc", &PathTrie::score_ctc)
-        .def_readwrite("score_lm", &PathTrie::score_lm)
-        .def_readwrite("character", &PathTrie::character)
-        .def_readwrite("timestep", &PathTrie::timestep)
-        .def_readonly("parent", &PathTrie::parent, py::return_value_policy::reference)
-        .def_property_readonly("prefix", [](PathTrie &self) {
-            std::vector<int> prefix;
-            std::vector<int> timesteps;
-            self.get_path_vec(prefix, timesteps);
-            return prefix;
-        }, py::return_value_policy::copy)
-        .def_property_readonly("timesteps", [](PathTrie &self) {
-            std::vector<int> prefix;
-            std::vector<int> timesteps;
-            self.get_path_vec(prefix, timesteps);
-            return timesteps;
-        }, py::return_value_policy::copy)
-        .def_property_readonly("children", &PathTrie::getChildren, py::return_value_policy::reference)
-        .def("__repr__", [](const PathTrie &self){
-            return "Node(key=" + std::to_string(self.character) + ", timestep=" +  std::to_string(self.timestep) + ", p_b=" + std::to_string(self.log_prob_b_prev) + ", p_nb=" + std::to_string(self.log_prob_nb_prev) + "score=" + std::to_string(self.score) + ")";
-        });
-    m.def("prune", &prune);
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+  m.def("paddle_beam_decode", &paddle_beam_decode, "paddle_beam_decode");
+  m.def("paddle_beam_decode_lm", &paddle_beam_decode_lm, "paddle_beam_decode_lm");
+  m.def("paddle_get_scorer", &paddle_get_scorer, "paddle_get_scorer");
+  m.def("is_character_based", &is_character_based, "is_character_based");
+  m.def("get_max_order", &get_max_order, "get_max_order");
+  m.def("get_dict_size", &get_dict_size, "get_max_order");
+  m.def("reset_params", &reset_params, "reset_params");
 }
