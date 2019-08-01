@@ -2,14 +2,17 @@ import torch
 
 
 class BaseTokenizer:
-    reserved_tokens = ['<blank>']
-
-    def __init__(self, vocab_file, ignored_tokens=[], allow_unknown=False):
+    def __init__(self,
+                 vocab_file,
+                 ignored_tokens=[],
+                 allow_unknown=False,
+                 reserved_tokens={'blank': '<blank>'}):
         self.ignored_tokens = ignored_tokens
+        self.reserved_tokens = reserved_tokens
         self._token2idx = {}
 
         if allow_unknown:
-            self.reserved_tokens += ['<unk>']
+            self.reserved_tokens += {'unk': '<unk>'}
 
         with open(vocab_file, 'r', encoding='utf8') as f:
             for idx, line in enumerate(f):
@@ -21,10 +24,10 @@ class BaseTokenizer:
 
                 self._token2idx[c] = idx
 
-        for t in self.reserved_tokens:
-            if t not in self._token2idx:
-                print(f'Token {t} not found. Defining it with index {len(self._token2idx)}')
-                self._token2idx[t] = len(self._token2idx)
+        for k, v in self.reserved_tokens.items():
+            if v not in self._token2idx:
+                print(f'Token {k} not found. Defining it with index {len(self._token2idx)}')
+                self._token2idx[v] = len(self._token2idx)
 
         self._idx2token = {v: k for k, v in self._token2idx.items()}
         self._len = len(self._token2idx)
@@ -33,8 +36,10 @@ class BaseTokenizer:
         return self._len
 
     def token2idx(self, tokens):
-        if '<unk>' in self._token2idx:
-            return [self._token2idx.get(t, self._token2idx['<unk>']) for t in tokens]
+        if self.reserved_tokens['unk'] in self._token2idx:
+            return [
+                self._token2idx.get(t, self._token2idx[self.reserved_tokens['unk']]) for t in tokens
+            ]
 
         return [self._token2idx[t] for t in tokens]
 
@@ -50,23 +55,35 @@ class BaseTokenizer:
         return join.join(token_ids)
 
     @property
+    def space_token(self):
+        return self.reserved_tokens['space']
+
+    @property
+    def blank_token(self):
+        return self.reserved_tokens['blank']
+
+    @property
     def blank_idx(self):
-        return self._token2idx['<blank>']
+        return self._token2idx[self.blank_token]
 
     @property
     def space_idx(self):
-        return self._token2idx.get('<space>', None)
+        return self._token2idx.get(self.space_token, None)
 
 
 class CharTokenizer(BaseTokenizer):
-
-    reserved_tokens = ['<blank>', '<space>']
-
-    def __init__(self, vocab_file, ignored_tokens=[], allow_unknown=False):
-        super().__init__(vocab_file, ignored_tokens, allow_unknown)
+    def __init__(self,
+                 vocab_file,
+                 ignored_tokens=[],
+                 allow_unknown=False,
+                 reserved_tokens={
+                     'blank': '<blank>',
+                     'space': '<space>'
+                 }):
+        super().__init__(vocab_file, ignored_tokens, allow_unknown, reserved_tokens)
 
     def token2idx(self, text):
-        chars = map(lambda x: x.replace(' ', '<space>'), list(text))
+        chars = map(lambda x: x.replace(' ', self.reserved_tokens['space']), list(text))
         return super().token2idx(chars)
 
     def idx2token(self, token_ids, as_list=False):
@@ -75,7 +92,7 @@ class CharTokenizer(BaseTokenizer):
         if as_list:
             return out
 
-        return out.replace('<space>', ' ')
+        return out.replace(self.reserved_tokens['space'], ' ')
 
 
 class WordTokenizer(BaseTokenizer):

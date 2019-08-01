@@ -47,7 +47,7 @@ class KenLMScorer:
 
             tokens = sentence.split()
         else:
-            tokens = list(map(lambda x: x.replace(' ', '<space>'), list(sentence)))
+            tokens = list(map(lambda x: x.replace(' ', self.tokenizer.space_token), list(sentence)))
 
         sentence = ' '.join(tokens).strip()
 

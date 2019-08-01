@@ -33,7 +33,7 @@ def tune_from_args(args):
     extract_start = default_timer()
 
     if args.unit == 'char':
-        vocab = CharTokenizer(args.vocab_file)
+        vocab = CharTokenizer(args.vocab_file, reserved_tokens={'blank': '<blank>', 'space': args.space_token})
     else:
         vocab = WordTokenizer(args.vocab_file)
 
@@ -68,9 +68,8 @@ def init(logits_targets_file, alphabet, lm_path, lm_trie_path, lm_unit, beam_siz
 
     saved_outputs = torch.load(logits_targets_file)
     vocab = alphabet
-    scorer = KenLMScorer(lm_path, alphabet, lm_trie_path, lm_unit)
+    scorer = KenLMScorer(lm_path, alphabet, lm_trie_path, unit=lm_unit)
     decoder = partial(ctc_beam_search_decoder,
-                      lm_scorer=scorer,
                       beam_size=beam_size,
                       blank=alphabet.blank_idx,
                       cutoff_prob=cutoff_prob,
@@ -93,7 +92,7 @@ def tune_step(params):
     total_cer, total_wer, num_tokens, num_chars = 0, 0, 0, 0
     for i, (output, reference) in enumerate(saved_outputs):
 
-        transcript = decoder(torch.as_tensor(output, dtype=torch.float32))[0][1]
+        transcript = decoder(torch.as_tensor(output, dtype=torch.float32), lm_scorer=scorer)[0][1]
         transcript = vocab.idx2token(transcript)
 
         total_wer += metrics.wer(reference, transcript)
@@ -130,8 +129,8 @@ if __name__ == '__main__':
     lm_args = parser.add_argument_group("LM Options")
     lm_args.add_argument('--lm-path', default=None, type=str, help='Language model to use')
     lm_args.add_argument('--lm-trie-path')
-    lm_args.add_argument('--lm-unit', choices=['word', 'char'], default='char')
-
+    lm_args.add_argument('--lm-unit', choices=['word', 'char'], default='word')
+    lm_args.add_argument('--space-token', default='<space>')
     beam_args = parser.add_argument_group("Beam Decode Options",
                                           "paramsurations options for the CTC Beam Search decoder")
 
