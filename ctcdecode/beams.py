@@ -1,3 +1,4 @@
+import copy
 from collections.abc import MutableMapping
 from dataclasses import dataclass
 from operator import itemgetter
@@ -11,6 +12,7 @@ LOG_1 = 0.0
 
 @dataclass
 class Beam:
+    p: float = LOG_0
     p_b: float = LOG_0
     p_nb: float = LOG_0
 
@@ -46,16 +48,21 @@ class Beams(MutableMapping):
     def __getitem__(self, key):
         return self.getitem(key)
 
-    def getitem(self, key, previous_beam=None):
+    def getitem(self, key, p=None, previous_beam=None):
 
         if key in self.beams:
-            return self.beams[key]
+            beam = self.beams[key]
+            if p and p > beam.p:
+                beam.p = p
+                beam.timesteps = beam.timesteps[:-1] + (self.timestep,)
+            return beam
 
         new_beam = Beam()
 
         if previous_beam:
             new_beam.timesteps = previous_beam.timesteps + (self.timestep, )
-            new_beam.state = previous_beam.state
+            new_beam.p = p
+            new_beam.state = copy.deepcopy(previous_beam.state)
 
             if self.is_valid and not self.is_valid(key[-1], new_beam.state):
                 return None

@@ -34,13 +34,9 @@ class BaseTokenizer:
 
     def token2idx(self, tokens):
         if '<unk>' in self._token2idx:
-            return [
-                self._token2idx.get(t, self._token2idx['<unk>']) for t in tokens
-            ]
+            return [self._token2idx.get(t, self._token2idx['<unk>']) for t in tokens]
 
-        return [
-            self._token2idx[t] for t in tokens
-        ]
+        return [self._token2idx[t] for t in tokens]
 
     def idx2token(self, token_ids, as_list=False, join=''):
         if isinstance(token_ids, torch.Tensor):
@@ -73,7 +69,6 @@ class CharTokenizer(BaseTokenizer):
         chars = map(lambda x: x.replace(' ', '<space>'), list(text))
         return super().token2idx(chars)
 
-
     def idx2token(self, token_ids, as_list=False):
         out = super().idx2token(token_ids, as_list=as_list)
 
@@ -81,6 +76,7 @@ class CharTokenizer(BaseTokenizer):
             return out
 
         return out.replace('<space>', ' ')
+
 
 class WordTokenizer(BaseTokenizer):
     def __init__(self, vocab_file, ignored_tokens=[], allow_unknown=False):

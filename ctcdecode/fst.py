@@ -51,10 +51,10 @@ class FST:
                 i += 1
 
                 dest_state = fst.add_state()
-                fst.add_arc(source_state, fst.Arc(i, i, 0, dest_state))
+                fst.add_arc(source_state, openfst.Arc(i, i, 0, dest_state))
                 source_state = dest_state
 
-            fst.set_final(dest_state, fst.Weight.One('tropical'))
+            fst.set_final(dest_state, openfst.Weight.One('tropical'))
 
         lexicon_size = 0
         for word in vocab:
@@ -71,7 +71,7 @@ class FST:
         # only one possible state the FST could be in.  It is assumed our
         # dictionary is deterministic when using it.
         # (lest we'd have to check for multiple transitions at each state)
-        fst = fst.determinize(fst)
+        fst = openfst.determinize(fst)
 
         # Finds the simplest equivalent fst. This is unnecessary but decreases
         # memory usage of the dictionary
