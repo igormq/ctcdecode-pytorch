@@ -6,25 +6,27 @@ import os
 import shlex
 import subprocess
 import sys
+import platform
 
 from multiprocessing.dummy import Pool
 
-ARGS = ['-O3', '-DNDEBUG', '-DKENLM_MAX_ORDER=20', '-std=c++11', '-Wno-unused-local-typedefs', '-Wno-sign-compare']
+ARGS = ['-O3', '-DNDEBUG', '-DKENLM_MAX_ORDER=20', '-Wno-unused-local-typedefs', '-Wno-sign-compare', '-std=c++11']
 
-INCLUDES = [
-    './', '../../third_party/kenlm', '../../third_party/openfst-1.6.7/src/include', '../../third_party/ThreadPool'
-]
+if platform.system() == 'Darwin':
+    ARGS += ["-stdlib=libc++", "-mmacosx-version-min=10.7"]
 
-COMMON_FILES = (glob.glob('../kenlm/util/*.cc') + glob.glob('../kenlm/lm/*.cc') +
-                glob.glob('../kenlm/util/double-conversion/*.cc'))
+INCLUDES = ['./', '../../third_party/kenlm', '../../third_party/openfst/src/include', '../../third_party/ThreadPool']
 
-COMMON_FILES += glob.glob('third_party/openfst-1.6.7/src/lib/*.cc')
+COMMON_FILES = (glob.glob('../../third_party/kenlm/util/*.cc') + glob.glob('../../third_party/kenlm/lm/*.cc') +
+                glob.glob('../../third_party/kenlm/util/double-conversion/*.cc'))
 
-COMMON_FILES = [
-    fn for fn in COMMON_FILES if not (fn.endswith('main.cc') or fn.endswith('test.cc') or fn.endswith('unittest.cc'))
-]
+COMMON_FILES += glob.glob('../../third_party/openfst/src/lib/*.cc')
 
-COMMON_FILES += glob.glob('*.cpp')
+# COMMON_FILES = [
+#     fn for fn in COMMON_FILES if not (fn.endswith('main.cc') or fn.endswith('test.cc') or fn.endswith('unittest.cc'))
+# ]
+
+# COMMON_FILES += glob.glob('*.cpp')
 
 
 def build_common(out_name='common.a', build_dir='temp_build/temp_build', num_parallel=1):

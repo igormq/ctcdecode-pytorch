@@ -1,0 +1,9 @@
+[submodule "third_party/kenlm"]
+	path = third_party/kenlm
+	url = git@github.com:kpu/kenlm.git
+[submodule "third_party/openfst"]
+	path = third_party/openfst
+	url = git@github.com:mjansche/openfst.git
+[submodule "third_party/ThreadPool"]
+	path = third_party/ThreadPool
+	url = git@github.com:progschj/ThreadPool.git

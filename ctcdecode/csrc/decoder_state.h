@@ -2,6 +2,7 @@
 #define DECODERSTATE_H_
 
 #include <vector>
+#include "path_trie.h"
 
 /* Struct for the state of the decoder, containing the prefixes and initial root prefix plus state variables. */
 

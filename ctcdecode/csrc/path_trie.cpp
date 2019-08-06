@@ -9,11 +9,13 @@
 #include "decoder_utils.h"
 
 PathTrie::PathTrie() {
-  log_prob_b_prev = -NUM_FLT_INF;
-  log_prob_nb_prev = -NUM_FLT_INF;
-  log_prob_b_cur = -NUM_FLT_INF;
-  log_prob_nb_cur = -NUM_FLT_INF;
+  p_b = -NUM_FLT_INF;
+  p_nb = -NUM_FLT_INF;
+  n_p_b = -NUM_FLT_INF;
+  n_p_nb = -NUM_FLT_INF;
   log_prob_c = -NUM_FLT_INF;
+  score_ctc = -NUM_FLT_INF;
+  score_lm = 0.0;
   score = -NUM_FLT_INF;
 
   ROOT_ = -1;
@@ -49,10 +51,10 @@ PathTrie* PathTrie::get_path_trie(int new_char, int new_timestep, float cur_log_
   if (child != children_.end()) {
     if (!child->second->exists_) {
       child->second->exists_ = true;
-      child->second->log_prob_b_prev = -NUM_FLT_INF;
-      child->second->log_prob_nb_prev = -NUM_FLT_INF;
-      child->second->log_prob_b_cur = -NUM_FLT_INF;
-      child->second->log_prob_nb_cur = -NUM_FLT_INF;
+      child->second->p_b = -NUM_FLT_INF;
+      child->second->p_nb = -NUM_FLT_INF;
+      child->second->n_p_b = -NUM_FLT_INF;
+      child->second->n_p_nb = -NUM_FLT_INF;
     }
     return (child->second);
   } else {
@@ -127,13 +129,14 @@ PathTrie* PathTrie::get_path_vec(std::vector<int>& output,
 
 void PathTrie::iterate_to_vec(std::vector<PathTrie*>& output) {
   if (exists_) {
-    log_prob_b_prev = log_prob_b_cur;
-    log_prob_nb_prev = log_prob_nb_cur;
+    p_b = n_p_b;
+    p_nb = n_p_nb;
 
-    log_prob_b_cur = -NUM_FLT_INF;
-    log_prob_nb_cur = -NUM_FLT_INF;
+    n_p_b = -NUM_FLT_INF;
+    n_p_nb = -NUM_FLT_INF;
 
-    score = log_sum_exp(log_prob_b_prev, log_prob_nb_prev);
+    score_ctc = log_sum_exp(p_b, p_nb);
+    score = score_ctc + score_lm;
     output.push_back(this);
   }
   for (auto child : children_) {

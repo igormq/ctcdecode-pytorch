@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "fst/fstlib.h"
+#include "LM.h"
 
 /* Trie tree for prefix storing and manipulating, with a dictionary in
  * finite-state transducer for spelling correction.
@@ -44,16 +45,18 @@ public:
   // remove current path from root
   void remove();
 
-  float log_prob_b_prev;
-  float log_prob_nb_prev;
-  float log_prob_b_cur;
-  float log_prob_nb_cur;
+  float p_b;
+  float p_nb;
+  float n_p_b;
+  float n_p_nb;
   float log_prob_c;
   float score;
-  float approx_ctc;
+  float score_ctc;
+  float score_lm;
   int character;
   int timestep;
   PathTrie* parent;
+  LMStatePtr lmState;
 
 private:
   int ROOT_;

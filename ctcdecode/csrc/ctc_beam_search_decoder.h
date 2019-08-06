@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "scorer.h"
+#include "LM.h"
 #include "output.h"
 #include "alphabet.h"
 #include "decoder_state.h"
@@ -14,15 +14,16 @@
  * Parameters:
  *     alphabet: The alphabet.
  *     class_dim: Alphabet length (plus 1 for space character).
- *     ext_scorer: External scorer to evaluate a prefix, which consists of
+ *     lm: External scorer to evaluate a prefix, which consists of
  *                 n-gram language model scoring and word insertion term.
  *                 Default null, decoding the input sample without scorer.
  * Return:
  *     A struct containing prefixes and state variables.
 */
-DecoderState* decoder_init(const Alphabet &alphabet,
+DecoderState* decoder_init(int space_id,
+                           int blank_id,
                            int class_dim,
-                           Scorer *ext_scorer);
+                           const LMPtr &lm);
 
 /* Send data to the decoder
 
@@ -36,19 +37,18 @@ DecoderState* decoder_init(const Alphabet &alphabet,
  *     cutoff_prob: Cutoff probability for pruning.
  *     cutoff_top_n: Cutoff number for pruning.
  *     beam_size: The width of beam search.
- *     ext_scorer: External scorer to evaluate a prefix, which consists of
+ *     lm: External scorer to evaluate a prefix, which consists of
  *                 n-gram language model scoring and word insertion term.
  *                 Default null, decoding the input sample without scorer.
 */
 void decoder_next(const double *probs,
-                  const Alphabet &alphabet,
                   DecoderState *state,
                   int time_dim,
                   int class_dim,
                   double cutoff_prob,
                   size_t cutoff_top_n,
                   size_t beam_size,
-                  Scorer *ext_scorer);
+                  const LMPtr &lm);
 
 /* Get transcription for the data you sent via decoder_next()
 
@@ -56,7 +56,7 @@ void decoder_next(const double *probs,
  *     state: The state structure previously obtained from decoder_init().
  *     alphabet: The alphabet.
  *     beam_size: The width of beam search.
- *     ext_scorer: External scorer to evaluate a prefix, which consists of
+ *     lm: External scorer to evaluate a prefix, which consists of
  *                 n-gram language model scoring and word insertion term.
  *                 Default null, decoding the input sample without scorer.
  * Return:
@@ -64,21 +64,20 @@ void decoder_next(const double *probs,
  *     in descending order.
 */
 std::vector<Output> decoder_decode(DecoderState *state,
-                                   const Alphabet &alphabet,
                                    size_t beam_size,
-                                   Scorer* ext_scorer);
+                                   LMPtr& lm);
 
 /* CTC Beam Search Decoder
  * Parameters:
  *     probs: 2-D vector where each element is a vector of probabilities
  *            over alphabet of one time step.
  *     time_dim: Number of timesteps.
- *     class_dim: Alphabet length (plus 1 for space character).
+ *     class_dim: Alphabet length (plus 1 for blank character).
  *     alphabet: The alphabet.
  *     beam_size: The width of beam search.
  *     cutoff_prob: Cutoff probability for pruning.
  *     cutoff_top_n: Cutoff number for pruning.
- *     ext_scorer: External scorer to evaluate a prefix, which consists of
+ *     lm: External scorer to evaluate a prefix, which consists of
  *                 n-gram language model scoring and word insertion term.
  *                 Default null, decoding the input sample without scorer.
  * Return:
@@ -90,11 +89,12 @@ std::vector<Output> ctc_beam_search_decoder(
     const double* probs,
     int time_dim,
     int class_dim,
-    const Alphabet &alphabet,
+    int space_id,
+    int blank_id,
     size_t beam_size,
     double cutoff_prob,
     size_t cutoff_top_n,
-    Scorer *ext_scorer);
+    const LMPtr &lm);
 
 /* CTC Beam Search Decoder for batch data
  * Parameters:
@@ -105,7 +105,7 @@ std::vector<Output> ctc_beam_search_decoder(
  *     num_processes: Number of threads for beam search.
  *     cutoff_prob: Cutoff probability for pruning.
  *     cutoff_top_n: Cutoff number for pruning.
- *     ext_scorer: External scorer to evaluate a prefix, which consists of
+ *     lm: External scorer to evaluate a prefix, which consists of
  *                 n-gram language model scoring and word insertion term.
  *                 Default null, decoding the input sample without scorer.
  * Return:
@@ -120,11 +120,12 @@ ctc_beam_search_decoder_batch(
     int class_dim,
     const int* seq_lengths,
     int seq_lengths_size,
-    const Alphabet &alphabet,
+    int space_id,
+    int blank_id,
     size_t beam_size,
     size_t num_processes,
     double cutoff_prob,
     size_t cutoff_top_n,
-    Scorer *ext_scorer);
+    const LMPtr &lm);
 
 #endif  // CTC_BEAM_SEARCH_DECODER_H_
