@@ -1,1 +1,1 @@
-from .decoders import ctc_greedy_decoder
+from ctcdecode.decoders import ctc_greedy_decoder

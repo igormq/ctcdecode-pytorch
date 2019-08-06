@@ -3,11 +3,10 @@ from __future__ import absolute_import, division, print_function
 
 import glob
 import os
+import platform
 import shlex
 import subprocess
 import sys
-import platform
-
 from multiprocessing.dummy import Pool
 
 ARGS = ['-O3', '-DNDEBUG', '-DKENLM_MAX_ORDER=20', '-Wno-unused-local-typedefs', '-Wno-sign-compare', '-std=c++11']

@@ -20,8 +20,7 @@
  * Return:
  *     A struct containing prefixes and state variables.
 */
-DecoderState* decoder_init(int space_id,
-                           int blank_id,
+DecoderState *decoder_init(int blank_id,
                            int class_dim,
                            const LMPtr &lm);
 
@@ -41,7 +40,7 @@ DecoderState* decoder_init(int space_id,
  *                 n-gram language model scoring and word insertion term.
  *                 Default null, decoding the input sample without scorer.
 */
-void decoder_next(const double *probs,
+void decoder_next(const float *log_probs,
                   DecoderState *state,
                   int time_dim,
                   int class_dim,
@@ -65,7 +64,7 @@ void decoder_next(const double *probs,
 */
 std::vector<Output> decoder_decode(DecoderState *state,
                                    size_t beam_size,
-                                   LMPtr& lm);
+                                   LMPtr &lm);
 
 /* CTC Beam Search Decoder
  * Parameters:
@@ -73,7 +72,6 @@ std::vector<Output> decoder_decode(DecoderState *state,
  *            over alphabet of one time step.
  *     time_dim: Number of timesteps.
  *     class_dim: Alphabet length (plus 1 for blank character).
- *     alphabet: The alphabet.
  *     beam_size: The width of beam search.
  *     cutoff_prob: Cutoff probability for pruning.
  *     cutoff_top_n: Cutoff number for pruning.
@@ -86,10 +84,9 @@ std::vector<Output> decoder_decode(DecoderState *state,
 */
 
 std::vector<Output> ctc_beam_search_decoder(
-    const double* probs,
+    const float *log_probs,
     int time_dim,
     int class_dim,
-    int space_id,
     int blank_id,
     size_t beam_size,
     double cutoff_prob,
@@ -98,9 +95,8 @@ std::vector<Output> ctc_beam_search_decoder(
 
 /* CTC Beam Search Decoder for batch data
  * Parameters:
- *     probs: 3-D vector where each element is a 2-D vector that can be used
+ *     log_probs: 3-D vector where each element is a 2-D vector that can be used
  *                by ctc_beam_search_decoder().
- *     alphabet: The alphabet.
  *     beam_size: The width of beam search.
  *     num_processes: Number of threads for beam search.
  *     cutoff_prob: Cutoff probability for pruning.
@@ -114,13 +110,12 @@ std::vector<Output> ctc_beam_search_decoder(
 */
 std::vector<std::vector<Output>>
 ctc_beam_search_decoder_batch(
-    const double* probs,
+    const float *log_probs,
     int batch_size,
     int time_dim,
     int class_dim,
-    const int* seq_lengths,
+    const int *seq_lengths,
     int seq_lengths_size,
-    int space_id,
     int blank_id,
     size_t beam_size,
     size_t num_processes,
@@ -128,4 +123,6 @@ ctc_beam_search_decoder_batch(
     size_t cutoff_top_n,
     const LMPtr &lm);
 
-#endif  // CTC_BEAM_SEARCH_DECODER_H_
+#endif // CTC_BEAM_SEARCH_DECODER_H_
+// CTC_BEAM_SEARCH_DECODER_H_
+// CTC_BEAM_SEARCH_DECODER_H_

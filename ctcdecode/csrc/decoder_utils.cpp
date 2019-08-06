@@ -5,7 +5,7 @@
 #include <limits>
 
 std::vector<std::pair<size_t, float>> get_pruned_log_probs(
-    const double *log_prob_step,
+    const float *log_prob_step,
     size_t class_dim,
     double log_cutoff_prob,
     size_t cutoff_top_n) {

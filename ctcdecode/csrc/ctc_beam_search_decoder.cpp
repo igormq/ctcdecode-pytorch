@@ -13,8 +13,7 @@
 #include "path_trie.h"
 
 DecoderState *
-decoder_init(int space_id,
-             int blank_id,
+decoder_init(int blank_id,
              int class_dim,
              const LMPtr &lm)
 {
@@ -22,12 +21,23 @@ decoder_init(int space_id,
   // assign special ids
   DecoderState *state = new DecoderState;
   state->time_step = 0;
-  state->space_id = space_id;
   state->blank_id = blank_id;
 
   // init prefixes' root
   PathTrie *root = new PathTrie;
-  root->score_ctc = root->p_b = 0.0;
+  root->score = root->p_b = 0.0;
+
+  if (lm != nullptr)
+  {
+    std::cout << "cheguei" << std::endl;
+    std::cout << lm << std::endl;
+    // std::cout << lm->alpha << std::endl;
+    // std::cout << lm->beta << std::endl;
+    auto lm_state_ptr = lm->start(0);
+    std::cout << "foi" << std::endl;
+    root->lmState = lm_state_ptr;
+    std::cout << "saindo" << std::endl;
+  }
 
   state->prefix_root = root;
 
@@ -43,11 +53,11 @@ decoder_init(int space_id,
   return state;
 }
 
-void decoder_next(const double *probs,
+void decoder_next(const float *log_probs,
                   DecoderState *state,
                   int time_dim,
                   int class_dim,
-                  double cutoff_prob,
+                  double log_cutoff_prob,
                   size_t cutoff_top_n,
                   size_t beam_size,
                   const LMPtr &lm)
@@ -55,10 +65,11 @@ void decoder_next(const double *probs,
   // prefix search over time
   for (size_t rel_time_step = 0; rel_time_step < time_dim; ++rel_time_step, ++state->time_step)
   {
-    auto *prob = &probs[rel_time_step * class_dim];
+    auto *log_prob = &log_probs[rel_time_step * class_dim];
 
     float min_cutoff = -NUM_FLT_INF;
     bool full_beam = false;
+
     if (lm != nullptr)
     {
       size_t num_prefixes = std::min(state->prefixes.size(), beam_size);
@@ -66,12 +77,12 @@ void decoder_next(const double *probs,
           state->prefixes.begin(), state->prefixes.begin() + num_prefixes, prefix_compare);
 
       min_cutoff = state->prefixes[num_prefixes - 1]->score +
-                   std::log(prob[state->blank_id]) - std::max(0.0, lm->beta);
+                   log_prob[state->blank_id] - std::max(0.0, lm->beta);
       full_beam = (num_prefixes == beam_size);
     }
 
     std::vector<std::pair<size_t, float>> log_prob_idx =
-        get_pruned_log_probs(prob, class_dim, cutoff_prob, cutoff_top_n);
+        get_pruned_log_probs(log_prob, class_dim, log_cutoff_prob, cutoff_top_n);
     // loop over chars
     for (size_t index = 0; index < log_prob_idx.size(); index++)
     {
@@ -105,15 +116,10 @@ void decoder_next(const double *probs,
 
         float log_p = -NUM_FLT_INF;
 
-        if (c == prefix->character &&
-            prefix->p_b > -NUM_FLT_INF)
-        {
+        if (c == prefix->character && prefix->p_b > -NUM_FLT_INF)
           log_p = log_prob_c + prefix->p_b;
-        }
         else if (c != prefix->character)
-        {
           log_p = log_prob_c + prefix->score;
-        }
 
         prefix_new->n_p_nb =
             log_sum_exp(prefix_new->n_p_nb, log_p);
@@ -134,7 +140,7 @@ void decoder_next(const double *probs,
       } // end of loop over prefix
     }   // end of loop over vocabulary
 
-    // update log probs
+    // update log log_probs
     state->prefixes.clear();
     state->prefix_root->iterate_to_vec(state->prefixes);
 
@@ -185,26 +191,22 @@ std::vector<Output> decoder_decode(DecoderState *state,
   size_t num_prefixes = std::min(prefixes_copy.size(), beam_size);
   std::sort(prefixes_copy.begin(), prefixes_copy.begin() + num_prefixes, std::bind(prefix_compare_external, _1, _2, scores));
 
-  //TODO: expose this as an API parameter
-  const int top_paths = 1;
-
-  return get_beam_search_result(prefixes_copy, top_paths);
+  return get_beam_search_result(prefixes_copy, beam_size);
 }
 
 std::vector<Output> ctc_beam_search_decoder(
-    const double *probs,
+    const float *log_probs,
     int time_dim,
     int class_dim,
-    int space_id,
     int blank_id,
     size_t beam_size,
-    double cutoff_prob,
+    double log_cutoff_prob,
     size_t cutoff_top_n,
     const LMPtr &lm)
 {
 
-  DecoderState *state = decoder_init(space_id, blank_id, class_dim, lm);
-  decoder_next(probs, state, time_dim, class_dim, cutoff_prob, cutoff_top_n, beam_size, lm);
+  DecoderState *state = decoder_init(blank_id, class_dim, lm);
+  decoder_next(log_probs, state, time_dim, class_dim, log_cutoff_prob, cutoff_top_n, beam_size, lm);
   std::vector<Output> out = decoder_decode(state, beam_size, lm);
 
   delete state;
@@ -214,17 +216,16 @@ std::vector<Output> ctc_beam_search_decoder(
 
 std::vector<std::vector<Output>>
 ctc_beam_search_decoder_batch(
-    const double *probs,
+    const float *log_probs,
     int batch_size,
     int time_dim,
     int class_dim,
     const int *seq_lengths,
     int seq_lengths_size,
-    int space_id,
     int blank_id,
     size_t beam_size,
     size_t num_processes,
-    double cutoff_prob,
+    double log_cutoff_prob,
     size_t cutoff_top_n,
     const LMPtr &lm)
 {
@@ -238,13 +239,12 @@ ctc_beam_search_decoder_batch(
   for (size_t i = 0; i < batch_size; ++i)
   {
     res.emplace_back(pool.enqueue(ctc_beam_search_decoder,
-                                  &probs[i * time_dim * class_dim],
+                                  &log_probs[i * time_dim * class_dim],
                                   seq_lengths[i],
                                   class_dim,
-                                  space_id,
                                   blank_id,
                                   beam_size,
-                                  cutoff_prob,
+                                  log_cutoff_prob,
                                   cutoff_top_n,
                                   lm));
   }

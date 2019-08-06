@@ -54,7 +54,7 @@ T log_sum_exp(const T &x, const T &y) {
 
 // Get pruned probability vector for each time step's beam search
 std::vector<std::pair<size_t, float>> get_pruned_log_probs(
-    const double *log_prob_step,
+    const float *log_prob_step,
     size_t class_dim,
     double log_cutoff_prob,
     size_t cutoff_top_n);

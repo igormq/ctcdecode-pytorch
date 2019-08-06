@@ -8,7 +8,8 @@
 
 #include "decoder_utils.h"
 
-PathTrie::PathTrie() {
+PathTrie::PathTrie()
+{
   p_b = -NUM_FLT_INF;
   p_nb = -NUM_FLT_INF;
   n_p_b = -NUM_FLT_INF;
@@ -31,25 +32,33 @@ PathTrie::PathTrie() {
   matcher_ = nullptr;
 }
 
-PathTrie::~PathTrie() {
-  for (auto child : children_) {
+PathTrie::~PathTrie()
+{
+  for (auto child : children_)
+  {
     delete child.second;
   }
 }
 
-PathTrie* PathTrie::get_path_trie(int new_char, int new_timestep, float cur_log_prob_c, bool reset) {
+PathTrie *PathTrie::get_path_trie(int new_char, int new_timestep, float cur_log_prob_c, bool reset)
+{
   auto child = children_.begin();
-  for (child = children_.begin(); child != children_.end(); ++child) {
-    if (child->first == new_char) {
-      if (child->second->log_prob_c < cur_log_prob_c) {
+  for (child = children_.begin(); child != children_.end(); ++child)
+  {
+    if (child->first == new_char)
+    {
+      if (child->second->log_prob_c < cur_log_prob_c)
+      {
         child->second->log_prob_c = cur_log_prob_c;
         child->second->timestep = new_timestep;
       }
       break;
     }
   }
-  if (child != children_.end()) {
-    if (!child->second->exists_) {
+  if (child != children_.end())
+  {
+    if (!child->second->exists_)
+    {
       child->second->exists_ = true;
       child->second->p_b = -NUM_FLT_INF;
       child->second->p_nb = -NUM_FLT_INF;
@@ -57,21 +66,28 @@ PathTrie* PathTrie::get_path_trie(int new_char, int new_timestep, float cur_log_
       child->second->n_p_nb = -NUM_FLT_INF;
     }
     return (child->second);
-  } else {
-    if (has_dictionary_) {
+  }
+  else
+  {
+    if (has_dictionary_)
+    {
       matcher_->SetState(dictionary_state_);
       bool found = matcher_->Find(new_char + 1);
-      if (!found) {
+      if (!found)
+      {
         // Adding this character causes word outside dictionary
         auto FSTZERO = fst::TropicalWeight::Zero();
         auto final_weight = dictionary_->Final(dictionary_state_);
         bool is_final = (final_weight != FSTZERO);
-        if (is_final && reset) {
+        if (is_final && reset)
+        {
           dictionary_state_ = dictionary_->Start();
         }
         return nullptr;
-      } else {
-        PathTrie* new_path = new PathTrie;
+      }
+      else
+      {
+        PathTrie *new_path = new PathTrie;
         new_path->character = new_char;
         new_path->timestep = new_timestep;
         new_path->parent = this;
@@ -85,10 +101,13 @@ PathTrie* PathTrie::get_path_trie(int new_char, int new_timestep, float cur_log_
         auto FSTZERO = fst::TropicalWeight::Zero();
         auto final_weight = dictionary_->Final(matcher_->Value().nextstate);
         bool is_final = (final_weight != FSTZERO);
-        if (is_final && reset) {
+        if (is_final && reset)
+        {
           // restart spell checker at the start state
           new_path->dictionary_state_ = dictionary_->Start();
-        } else {
+        }
+        else
+        {
           // go to next state
           new_path->dictionary_state_ = matcher_->Value().nextstate;
         }
@@ -96,8 +115,10 @@ PathTrie* PathTrie::get_path_trie(int new_char, int new_timestep, float cur_log_
         children_.push_back(std::make_pair(new_char, new_path));
         return new_path;
       }
-    } else {
-      PathTrie* new_path = new PathTrie;
+    }
+    else
+    {
+      PathTrie *new_path = new PathTrie;
       new_path->character = new_char;
       new_path->timestep = new_timestep;
       new_path->parent = this;
@@ -108,27 +129,34 @@ PathTrie* PathTrie::get_path_trie(int new_char, int new_timestep, float cur_log_
   }
 }
 
-PathTrie* PathTrie::get_path_vec(std::vector<int>& output, std::vector<int>& timesteps) {
+PathTrie *PathTrie::get_path_vec(std::vector<int> &output, std::vector<int> &timesteps)
+{
   return get_path_vec(output, timesteps, ROOT_);
 }
 
-PathTrie* PathTrie::get_path_vec(std::vector<int>& output,
-                                 std::vector<int>& timesteps,
+PathTrie *PathTrie::get_path_vec(std::vector<int> &output,
+                                 std::vector<int> &timesteps,
                                  int stop,
-                                 size_t max_steps) {
-  if (character == stop || character == ROOT_ || output.size() == max_steps) {
+                                 size_t max_steps)
+{
+  if (character == stop || character == ROOT_ || output.size() == max_steps)
+  {
     std::reverse(output.begin(), output.end());
     std::reverse(timesteps.begin(), timesteps.end());
     return this;
-  } else {
+  }
+  else
+  {
     output.push_back(character);
     timesteps.push_back(timestep);
     return parent->get_path_vec(output, timesteps, stop, max_steps);
   }
 }
 
-void PathTrie::iterate_to_vec(std::vector<PathTrie*>& output) {
-  if (exists_) {
+void PathTrie::iterate_to_vec(std::vector<PathTrie *> &output)
+{
+  if (exists_)
+  {
     p_b = n_p_b;
     p_nb = n_p_nb;
 
@@ -139,25 +167,31 @@ void PathTrie::iterate_to_vec(std::vector<PathTrie*>& output) {
     score = score_ctc + score_lm;
     output.push_back(this);
   }
-  for (auto child : children_) {
+  for (auto child : children_)
+  {
     child.second->iterate_to_vec(output);
   }
 }
 
-void PathTrie::remove() {
+void PathTrie::remove()
+{
   exists_ = false;
 
-  if (children_.size() == 0) {
+  if (children_.size() == 0)
+  {
     auto child = parent->children_.begin();
     for (child = parent->children_.begin(); child != parent->children_.end();
-         ++child) {
-      if (child->first == character) {
+         ++child)
+    {
+      if (child->first == character)
+      {
         parent->children_.erase(child);
         break;
       }
     }
 
-    if (parent->children_.size() == 0 && !parent->exists_) {
+    if (parent->children_.size() == 0 && !parent->exists_)
+    {
       parent->remove();
     }
 
@@ -165,12 +199,14 @@ void PathTrie::remove() {
   }
 }
 
-void PathTrie::set_dictionary(PathTrie::FstType* dictionary) {
+void PathTrie::set_dictionary(PathTrie::FstType *dictionary)
+{
   dictionary_ = dictionary;
   dictionary_state_ = dictionary->Start();
   has_dictionary_ = true;
 }
 
-void PathTrie::set_matcher(std::shared_ptr<fst::SortedMatcher<FstType>> matcher) {
+void PathTrie::set_matcher(std::shared_ptr<fst::SortedMatcher<FstType>> matcher)
+{
   matcher_ = matcher;
 }
