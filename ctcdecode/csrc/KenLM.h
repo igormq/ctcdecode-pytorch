@@ -16,24 +16,29 @@
 #include <lm/state.hh>
 
 // KenLM forward declarations
-namespace lm {
-namespace base {
+namespace lm
+{
+namespace base
+{
 class Model;
 class Vocabulary;
 } // namespace base
-// namespace ngram {
+// namespace ngram
+// {
 // class State;
 // } // namespace ngram
 } // namespace lm
 
-struct KenLMState {
+struct KenLMState
+{
   lm::ngram::State state;
   std::vector<int> tokens;
 
-  KenLMState() : state() {}
+  KenLMState() {}
 };
 
-enum KenLMUnit {
+enum KenLMUnit
+{
   Word = 0,
   Char
 };
@@ -41,31 +46,30 @@ enum KenLMUnit {
 /**
  * KenLM extends LM by using the toolkit https://kheafield.com/code/kenlm/.
  */
-class KenLM : public LM {
- public:
-
-  KenLM(const std::string& path, const Tokenizer& tokenizer, KenLMUnit unit);
+class KenLM : public LM
+{
+public:
+  KenLM(const std::string &path, const Tokenizer &tokenizer, KenLMUnit unit);
 
   LMStatePtr start(bool startWithNothing) override;
 
   std::pair<LMStatePtr, float> score(
-      const LMStatePtr& state,
+      const LMStatePtr &state,
       const int usrTokenIdx) override;
 
-  std::pair<LMStatePtr, float> finish(const LMStatePtr& state) override;
+  std::pair<LMStatePtr, float> finish(const LMStatePtr &state) override;
 
-  int compareState(const LMStatePtr& state1, const LMStatePtr& state2)
+  int compareState(const LMStatePtr &state1, const LMStatePtr &state2)
       const override;
 
   KenLMUnit unit;
+  const Tokenizer *tokenizer_;
 
- private:
+private:
   std::shared_ptr<lm::base::Model> model_;
-  const lm::base::Vocabulary* vocab_;
+  const lm::base::Vocabulary *vocab_;
 
-  static KenLMState* getRawState(const LMStatePtr& state);
-
-  const Tokenizer* tokenizer_;
+  static KenLMState *getRawState(const LMStatePtr &state);
 };
 
 using KenLMPtr = std::shared_ptr<KenLM>;

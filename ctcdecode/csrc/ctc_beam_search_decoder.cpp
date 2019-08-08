@@ -1,6 +1,5 @@
 #include "ctc_beam_search_decoder.h"
 
-#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -30,6 +29,7 @@ decoder_init(int blank_id,
   if (lm != nullptr)
   {
     auto lm_state_ptr = lm->start(0);
+    std::cout << lm_state_ptr << std::endl;
     root->lmState = lm_state_ptr;
   }
 
@@ -63,7 +63,7 @@ void decoder_next(const float *log_probs,
   {
     auto *log_prob = &log_probs[rel_time_step * class_dim];
 
-    float min_cutoff = -NUM_FLT_INF;
+    float min_cutoff = -NUM_FLT_MIN;
     bool full_beam = false;
 
     if (lm != nullptr)
@@ -110,9 +110,9 @@ void decoder_next(const float *log_probs,
         if (prefix_new == nullptr)
           continue;
 
-        float log_p = -NUM_FLT_INF;
+        float log_p = -NUM_FLT_MIN;
 
-        if (c == prefix->character && prefix->p_b > -NUM_FLT_INF)
+        if (c == prefix->character && prefix->p_b > -NUM_FLT_MIN)
           log_p = log_prob_c + prefix->p_b;
         else if (c != prefix->character)
           log_p = log_prob_c + prefix->score;
@@ -127,12 +127,11 @@ void decoder_next(const float *log_probs,
         std::pair<LMStatePtr, float> lm_out;
         lm_out = lm->score(prefix->lmState, prefix_new->character);
 
-        if (lm_out.second > -NUM_FLT_INF)
+        prefix_new->lmState = lm_out.first;
+        if (lm_out.second > -NUM_FLT_MIN)
         {
           prefix_new->score_lm = prefix->score_lm + lm_out.second * alpha + beta;
-          prefix_new->lmState = lm_out.first;
         }
-
       } // end of loop over prefix
     }   // end of loop over vocabulary
 
@@ -177,7 +176,7 @@ std::vector<Output> decoder_decode(DecoderState *state,
         std::pair<LMStatePtr, float> lm_out;
 
         lm_out = lm->finish(prefix->lmState);
-        if (lm_out.second > -NUM_FLT_INF)
+        if (lm_out.second > -NUM_FLT_MIN)
           scores[prefix] += lm_out.second * alpha + beta;
       }
     }
@@ -232,10 +231,6 @@ ctc_beam_search_decoder_batch(
 
   // enqueue the tasks of decoding
   std::vector<std::future<std::vector<Output>>> res;
-
-    // pybind11::gil_scoped_release nogil;
-
-  // std::vector<std::vector<Output>> res;
   for (size_t i = 0; i < batch_size; ++i)
   {
     res.emplace_back(pool.enqueue(ctc_beam_search_decoder,
@@ -247,15 +242,6 @@ ctc_beam_search_decoder_batch(
                                   log_cutoff_prob,
                                   cutoff_top_n,
                                   lm, alpha, beta));
-    // res.emplace_back(ctc_beam_search_decoder(
-    //                               &log_probs[i * time_dim * class_dim],
-    //                               seq_lengths[i],
-    //                               class_dim,
-    //                               blank_id,
-    //                               beam_size,
-    //                               log_cutoff_prob,
-    //                               cutoff_top_n,
-    //                               lm, alpha, beta));
   }
 
   // // get decoding results
@@ -263,8 +249,6 @@ ctc_beam_search_decoder_batch(
   for (size_t i = 0; i < batch_size; ++i)
   {
     batch_results.emplace_back(res[i].get());
-    // batch_results.emplace_back(res[i]);
   }
   return batch_results;
-  // return res;
 }

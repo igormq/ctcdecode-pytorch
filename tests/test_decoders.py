@@ -7,8 +7,8 @@ import pytest
 import torch
 
 from ctcdecode import decoders
-from ctcdecode.lm import KenLM
-from ctcdecode.tokenizer import CharTokenizer
+from ctcdecode.lm import KenLM, KenLMUnit
+from ctcdecode.tokenizer import Tokenizer
 
 data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 
@@ -108,32 +108,34 @@ def test_real_ctc_decode():
     data = np.genfromtxt(os.path.join(data_dir, "rnn_output.csv"), delimiter=';')[:, :-1]
     inputs = torch.as_tensor(data).log_softmax(1)
 
-    tokenizer = CharTokenizer(os.path.join(data_dir, 'labels.txt'))
+    tokenizer = Tokenizer(os.path.join(data_dir, 'labels.txt'))
+    tokenizer.blank_index = tokenizer.get_index('<blank>')
+    tokenizer.space_index = tokenizer.get_index('<space>')
 
     # greedy using beam
-    result = decoders.ctc_greedy_decoder(inputs, blank=tokenizer.blank_idx)
-    txt_result = ''.join(tokenizer.idx2token(result[1]))
+    result = decoders.ctc_greedy_decoder(inputs, blank=tokenizer.blank_index)
+    txt_result = ''.join(tokenizer.idxs2entries(result[1].tolist())).replace('<space>', ' ')
 
     assert "the fak friend of the fomly hae tC" == txt_result
 
     # default beam decoding
-    result = decoders.ctc_beam_search_decoder(inputs, blank=tokenizer.blank_idx, beam_size=25)
+    result = decoders.ctc_beam_search_decoder(inputs, blank=tokenizer.blank_index, beam_size=25)
 
-    txt_result = ''.join(tokenizer.idx2token(result[0][1]))
+    txt_result = ''.join(tokenizer.idxs2entries(result[0][1]))
     # assert "the fak friend of the fomcly hae tC" == txt_result
 
     # lm-based decoding
-    scorer = KenLM(os.path.join(data_dir, 'bigram.arpa'), tokenizer, alpha=2.0, beta=0, unit='word')
+    scorer = KenLM(os.path.join(data_dir, 'bigram.arpa'), tokenizer, unit=KenLMUnit.Word)
     result = decoders.ctc_beam_search_decoder(
-        inputs, lm_scorer=scorer, blank=tokenizer.blank_idx, beam_size=25)
-    txt_result = ''.join(tokenizer.idx2token(result[0][1]))
-    assert "the fake friend of the fomlyhaetC" == txt_result
+        inputs, lm_scorer=scorer, blank=tokenizer.blank_index, beam_size=25, alpha=2, beta=0)
+    txt_result = ''.join(tokenizer.idxs2entries(result[0][1])).replace('<space>', ' ')
+    assert "the fake friend of the family, lie th" == txt_result
 
     # lm-based decoding with trie
     # scorer = KenLMScorer(os.path.join(data_dir, 'bigram.arpa'), tokenizer, trie_path=os.path.join(data_dir, 'trie.fst'), alpha=2.0, beta=0, unit='word')
     # result = decoders.ctc_beam_search_decoder(
-    #     inputs, lm_scorer=scorer, blank=tokenizer.blank_idx, beam_size=25)
-    # txt_result = ''.join(tokenizer.idx2token(result[0][1]))
+    #     inputs, lm_scorer=scorer, blank=tokenizer.blank_index, beam_size=25)
+    # txt_result = ''.join(tokenizer.idxs2entries(result[0][1]))
     # assert "the fake friend of the family, like the" == txt_result
 
 
@@ -146,9 +148,9 @@ def test_real_ctc_decode2():
     tokenizer = CharTokenizer(os.path.join(data_dir, 'toy-data-vocab.txt'))
     beam_width = 16
 
-    result = decoders.ctc_beam_search_decoder(seq, blank=tokenizer.blank_idx, beam_size=beam_width)
+    result = decoders.ctc_beam_search_decoder(seq, blank=tokenizer.blank_index, beam_size=beam_width)
 
-    txt_result = ''.join(tokenizer.idx2token(result[0][1]))
+    txt_result = ''.join(tokenizer.idxs2entries(result[0][1]))
 
     assert txt_result == 'then seconds'
     assert np.allclose(1.1842575, result[0][0], atol=1e-3)
@@ -157,8 +159,8 @@ def test_real_ctc_decode2():
     # lm-based decoding
     scorer = KenLMScorer(os.path.join(data_dir, 'ctc-test-lm.binary'), tokenizer, alpha=2.0, beta=0.5, unit='word')
     result = decoders.ctc_beam_search_decoder(
-        seq, lm_scorer=scorer, blank=tokenizer.blank_idx, beam_size=beam_width)
-    txt_result = ''.join(tokenizer.idx2token(result[0][1]))
+        seq, lm_scorer=scorer, blank=tokenizer.blank_index, beam_size=beam_width)
+    txt_result = ''.join(tokenizer.idxs2entries(result[0][1]))
 
     assert txt_result == label
     # assert np.allclose(4.619581, result[0][0], atol=1e-3)

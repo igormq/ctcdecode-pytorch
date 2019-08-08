@@ -132,9 +132,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 
     py::class_<Tokenizer>(m, "Tokenizer")
         .def(py::init<>())
-        .def(py::init<const std::string&>(), "filename"_a)
-        .def("add_entry", (void (Tokenizer::*)(const std::string &, int)) &Tokenizer::addEntry, "entry"_a, "index"_a)
-        .def("add_entry", (void (Tokenizer::*)(const std::string &)) &Tokenizer::addEntry, "entry"_a)
+        .def(py::init<const std::string &>(), "filename"_a)
+        .def("add_entry", (void (Tokenizer::*)(const std::string &, int)) & Tokenizer::addEntry, "entry"_a, "index"_a)
+        .def("add_entry", (void (Tokenizer::*)(const std::string &)) & Tokenizer::addEntry, "entry"_a)
         .def("get_entry", &Tokenizer::getEntry, "index"_a)
         .def_property("blank_index", &Tokenizer::getBlankIndex, &Tokenizer::setBlankIndex)
         .def_property("space_index", &Tokenizer::getSpaceIndex, &Tokenizer::setSpaceIndex)
@@ -147,16 +147,16 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         .def("idxs2entries", &Tokenizer::mapIndicesToEntries, "indices"_a)
         .def("is_contiguous", &Tokenizer::isContiguous);
 
-    py::class_<KenLM, KenLMPtr, LM>(m, "KenLM")
-        .def(
-            py::init<const std::string&, const Tokenizer&, KenLMUnit>(),
-            "path"_a,
-            "tokenizer"_a)
-        .def_readwrite("unit", &KenLM::unit);
-
     py::enum_<KenLMUnit>(m, "KenLMUnit")
         .value("Word", KenLMUnit::Word)
         .value("Char", KenLMUnit::Char);
+
+    py::class_<KenLM, KenLMPtr, LM>(m, "KenLM")
+        .def(
+            py::init<const std::string &, const Tokenizer &, KenLMUnit>(),
+            "path"_a,
+            "tokenizer"_a, "unit"_a = KenLMUnit::Word)
+        .def_readwrite("unit", &KenLM::unit);
 
     m.def("beam_decoder", &beam_decoder, "beam_decoder");
 }

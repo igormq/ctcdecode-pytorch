@@ -7,8 +7,8 @@ from ctcdecode.csrc import _C
 
 print(2)
 
-
 KenLM = _C.KenLM
+KenLMUnit = _C.KenLMUnit
 # class KenLMState(_C.LMState):
 #     __slots__ = ['state', 'tokens']
 

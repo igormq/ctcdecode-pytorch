@@ -1,0 +1,45 @@
+import argparse
+import glob
+import os
+import sys
+
+from setuptools import setup
+from torch.utils.cpp_extension import BuildExtension, CppExtension
+
+from build_common import ARGS, COMMON_FILES, INCLUDES, LIBS, build_common
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--num_processes",
+                    default=1,
+                    type=int,
+                    help="Number of cpu processes to build package. (default: %(default)d)")
+args = parser.parse_known_args()
+
+# reconstruct sys.argv to pass to setup below
+sys.argv = [sys.argv[0]] + args[1]
+
+project_version = '0.1'
+
+build_dir = 'temp_build/temp_build'
+common_build = 'common.a'
+
+if not os.path.exists(common_build):
+    if not os.path.exists(build_dir):
+        os.makedirs(build_dir)
+
+    build_common(out_name='common.a', build_dir=build_dir, num_parallel=args[0].num_processes)
+
+decoder_module = CppExtension(name='_C',
+                              sources=glob.glob('*.cpp') + COMMON_FILES,
+                              language='c++',
+                              include_dirs=INCLUDES + ['./'],
+                              extra_compile_args=ARGS,
+                              libraries=LIBS,
+                            #   extra_link_args=[common_build]
+                              )
+
+setup(name='ds_ctcdecoder',
+      version=project_version,
+      description="""DS CTC decoder""",
+      ext_modules=[decoder_module],
+      cmdclass={'build_ext': BuildExtension})

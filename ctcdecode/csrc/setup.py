@@ -1,30 +1,13 @@
-#!/usr/bin/env python
-from __future__ import absolute_import, division, print_function
-
-from setuptools import setup, Extension, distutils
-
-from torch.utils.cpp_extension import BuildExtension, CppExtension
-import glob
 import argparse
-import multiprocessing.pool
+import glob
 import os
 import platform
 import sys
 
-from build_common import *
+from setuptools import setup
+from torch.utils.cpp_extension import BuildExtension, CppExtension
 
-IS_WINDOWS = (platform.system() == 'Windows')
-IS_DARWIN = (platform.system() == 'Darwin')
-IS_LINUX = (platform.system() == 'Linux')
-
-if IS_LINUX:
-    ext_libs = ['stdc++', 'rt']
-elif IS_DARWIN:
-    ext_libs = ['c++']
-    # ext_libs = []
-    ARGS += ["-stdlib=libc++", "-mmacosx-version-min=10.9"]
-else:
-    ext_libs = []
+project_version = '0.1'
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--num_processes",
@@ -36,24 +19,46 @@ args = parser.parse_known_args()
 # reconstruct sys.argv to pass to setup below
 sys.argv = [sys.argv[0]] + args[1]
 
-project_version = '0.1'
+extra_compile_args = ['-O3']
+libraries = []
 
-build_dir = 'temp_build/temp_build'
-common_build = 'common.a'
+if os.environ.get('DEBUG', '0') == '1':
+    extra_compile_args = ['-O0', '-g']
 
-if not os.path.exists(common_build):
-    if not os.path.exists(build_dir):
-        os.makedirs(build_dir)
+extra_compile_args += [
+    '-DNDEBUG', '-DKENLM_MAX_ORDER=20', '-Wno-unused-local-typedefs', '-Wno-sign-compare',
+    '-std=c++11', '-w', '-DINCLUDE_KENLM'
+]
 
-    build_common(out_name='common.a', build_dir=build_dir, num_parallel=args[0].num_processes)
+if platform.system() == 'Linux':
+    libraries += ['stdc++', 'rt']
+elif platform.system() == 'Darwin':
+    extra_compile_args += ["-stdlib=libc++", "-mmacosx-version-min=10.9"]
+    libraries += ['c++']
+
+include_dirs = [
+    '../../third_party/kenlm', '../../third_party/openfst/src/include',
+    '../../third_party/ThreadPool', '../../third_party/boost'
+]
+
+sources = (glob.glob('../../third_party/kenlm/util/*.cc') +
+           glob.glob('../../third_party/kenlm/lm/*.cc') +
+           glob.glob('../../third_party/kenlm/util/double-conversion/*.cc'))
+
+sources += glob.glob('../../third_party/openfst/src/lib/*.cc')
+
+sources = [
+    fn for fn in sources
+    if not (fn.endswith('main.cc') or fn.endswith('test.cc') or fn.endswith('unittest.cc'))
+]
+sources += glob.glob('*.cpp')
 
 decoder_module = CppExtension(name='_C',
-                              sources=glob.glob('*.cpp'),
+                              sources=sources,
                               language='c++',
-                              include_dirs=INCLUDES,
-                              extra_compile_args=ARGS,
-                              libraries=ext_libs,
-                              extra_link_args=[common_build])
+                              include_dirs=include_dirs + ['./'],
+                              extra_compile_args=extra_compile_args,
+                              libraries=libraries)
 
 setup(name='ds_ctcdecoder',
       version=project_version,

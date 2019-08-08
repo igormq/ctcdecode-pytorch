@@ -1,10 +1,12 @@
+import time
+
 import torch
 
 from ctcdecode.csrc import _C
 from ctcdecode.decoders import ctc_beam_search_decoder
 from ctcdecode.lm import KenLM
 from ctcdecode.tokenizer import Tokenizer
-import time
+
 c = Tokenizer('tests/data/toy-data-vocab.txt')
 print(c.get_index("<space>"))
 print(c.get_index("<blank>"))
@@ -13,6 +15,7 @@ c.space_index = c.get_index("<space>")
 c.blank_index = c.get_index("<blank>")
 
 lm = KenLM('tests/data/bigram.arpa', c)
+print(1)
 
 log_probs = torch.randn(100, 29).log_softmax(1)
 
