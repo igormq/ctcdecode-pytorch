@@ -7,3 +7,6 @@
 [submodule "third_party/ThreadPool"]
 	path = third_party/ThreadPool
 	url = git@github.com:progschj/ThreadPool.git
+[submodule "third_party/boost"]
+	path = third_party/boost
+	url = git@github.com:boostorg/boost.git
