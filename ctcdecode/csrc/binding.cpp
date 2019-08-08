@@ -1,8 +1,5 @@
 #include <torch/torch.h>
 #include <pybind11/stl.h>
-#include <pybind11/complex.h>
-#include <pybind11/functional.h>
-#include <pybind11/chrono.h>
 #include "binding.h"
 
 using namespace pybind11::literals;
@@ -55,18 +52,6 @@ class PyLM : public LM
     }
 };
 
-LMStatePtr to_shared_ptr(py::object const &object)
-{
-    return std::make_shared<py::object>(object);
-}
-
-py::object *to_py_object(LMStatePtr &ptr)
-{
-    return static_cast<py::object *>(ptr.get());
-}
-
-LMStatePtr start(LMPtr lm) { return lm->start(0); }
-
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder(const at::Tensor log_probs,
                                                                         const at::Tensor seq_lengths,
                                                                         int blank_id,
@@ -74,7 +59,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder(const at
                                                                         int num_processes,
                                                                         double cutoff_prob,
                                                                         int cutoff_top_n,
-                                                                        LMPtr scorer)
+                                                                        LMPtr scorer,
+                                                                        double alpha,
+                                                                        double beta)
 {
     AT_ASSERT(log_probs.is_contiguous())
     AT_ASSERT(seq_lengths.is_contiguous())
@@ -97,7 +84,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder(const at
         num_processes,
         log(cutoff_prob),
         cutoff_top_n,
-        scorer);
+        scorer, alpha, beta);
 
     at::Tensor output = torch::empty({batch_size, beam_size, max_time}, torch::dtype(torch::kInt32).device(torch::kCPU));
     at::Tensor timesteps = torch::empty({batch_size, beam_size, max_time}, torch::dtype(torch::kInt32).device(torch::kCPU));
@@ -133,19 +120,43 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder(const at
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
 
-    py::class_<std::shared_ptr<void>>(m, "encapsulated_data");
+    py::class_<LMStatePtr>(m, "LMState")
+        .def(py::init<>());
 
     py::class_<LM, LMPtr, PyLM>(m, "LM")
         .def(py::init<>())
         .def("start", &LM::start, "start_with_nothing"_a)
         .def("score", &LM::score, "state"_a, "token_index"_a)
         .def("finish", &LM::finish, "state"_a)
-        .def("compare_state", &LM::compareState, "state1"_a, "state2"_a)
-        .def_readwrite("alpha", &LM::alpha)
-        .def_readwrite("beta", &LM::beta);
+        .def("compare_state", &LM::compareState, "state1"_a, "state2"_a);
+
+    py::class_<Tokenizer>(m, "Tokenizer")
+        .def(py::init<>())
+        .def(py::init<const std::string&>(), "filename"_a)
+        .def("add_entry", (void (Tokenizer::*)(const std::string &, int)) &Tokenizer::addEntry, "entry"_a, "index"_a)
+        .def("add_entry", (void (Tokenizer::*)(const std::string &)) &Tokenizer::addEntry, "entry"_a)
+        .def("get_entry", &Tokenizer::getEntry, "index"_a)
+        .def_property("blank_index", &Tokenizer::getBlankIndex, &Tokenizer::setBlankIndex)
+        .def_property("space_index", &Tokenizer::getSpaceIndex, &Tokenizer::setSpaceIndex)
+        .def_property("default_index", &Tokenizer::getDefaultIndex, &Tokenizer::setDefaultIndex)
+        .def("get_index", &Tokenizer::getIndex, "entry"_a)
+        .def("__contains__", &Tokenizer::contains)
+        .def("entry_size", &Tokenizer::entrySize)
+        .def("index_size", &Tokenizer::indexSize)
+        .def("entries2idxs", &Tokenizer::mapEntriesToIndices, "entries"_a)
+        .def("idxs2entries", &Tokenizer::mapIndicesToEntries, "indices"_a)
+        .def("is_contiguous", &Tokenizer::isContiguous);
+
+    py::class_<KenLM, KenLMPtr, LM>(m, "KenLM")
+        .def(
+            py::init<const std::string&, const Tokenizer&, KenLMUnit>(),
+            "path"_a,
+            "tokenizer"_a)
+        .def_readwrite("unit", &KenLM::unit);
+
+    py::enum_<KenLMUnit>(m, "KenLMUnit")
+        .value("Word", KenLMUnit::Word)
+        .value("Char", KenLMUnit::Char);
 
     m.def("beam_decoder", &beam_decoder, "beam_decoder");
-    m.def("to_shared_ptr", &to_shared_ptr, "to_shared_ptr");
-    m.def("to_py_object", &to_shared_ptr, "to_py_object");
-    m.def("start", &start, "start");
 }

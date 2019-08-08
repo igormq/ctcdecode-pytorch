@@ -22,7 +22,7 @@
 */
 DecoderState *decoder_init(int blank_id,
                            int class_dim,
-                           const LMPtr &lm);
+                           const LMPtr lm);
 
 /* Send data to the decoder
 
@@ -47,7 +47,7 @@ void decoder_next(const float *log_probs,
                   double cutoff_prob,
                   size_t cutoff_top_n,
                   size_t beam_size,
-                  const LMPtr &lm);
+                  const LMPtr lm, double alpha, double beta);
 
 /* Get transcription for the data you sent via decoder_next()
 
@@ -64,7 +64,7 @@ void decoder_next(const float *log_probs,
 */
 std::vector<Output> decoder_decode(DecoderState *state,
                                    size_t beam_size,
-                                   LMPtr &lm);
+                                   LMPtr lm);
 
 /* CTC Beam Search Decoder
  * Parameters:
@@ -91,7 +91,9 @@ std::vector<Output> ctc_beam_search_decoder(
     size_t beam_size,
     double cutoff_prob,
     size_t cutoff_top_n,
-    const LMPtr &lm);
+    const LMPtr lm,
+    double alpha,
+    double beta);
 
 /* CTC Beam Search Decoder for batch data
  * Parameters:
@@ -121,7 +123,9 @@ ctc_beam_search_decoder_batch(
     size_t num_processes,
     double cutoff_prob,
     size_t cutoff_top_n,
-    const LMPtr &lm);
+    const LMPtr lm,
+    double alpha,
+    double beta);
 
 #endif // CTC_BEAM_SEARCH_DECODER_H_
 // CTC_BEAM_SEARCH_DECODER_H_

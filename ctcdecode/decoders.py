@@ -1,5 +1,4 @@
 import torch
-
 from ctcdecode.csrc import _C
 
 
@@ -30,12 +29,7 @@ def ctc_greedy_decoder(log_probs_seq, blank=0):
 
 
 @torch.no_grad()
-def ctc_beam_search_decoder(log_probs_seq,
-                            lm_scorer=None,
-                            beam_size=100,
-                            blank=0,
-                            cutoff_prob=1.0,
-                            cutoff_top_n=40):
+def ctc_beam_search_decoder(log_probs_seq, lm_scorer=None, beam_size=100, blank=0, cutoff_prob=1.0, cutoff_top_n=40, alpha=0.0, beta=0.0):
     """
     Performs prefix beam search on the output of a CTC network.
 
@@ -57,10 +51,8 @@ def ctc_beam_search_decoder(log_probs_seq,
     num_processes = 1
 
     # print(log_probs_seq.view(-1)[0], log_probs_seq.view(-1)[1])
-    beam_result = _C.beam_decoder(log_probs_seq, seq_lengths, blank, beam_size, num_processes,
-                                  cutoff_prob, cutoff_top_n, lm_scorer)
+    beam_result = _C.beam_decoder(log_probs_seq, seq_lengths, blank, beam_size, num_processes, cutoff_prob,
+                                  cutoff_top_n, lm_scorer, alpha, beta)
 
-    return [
-        (beam_result[1][0][b].item(), beam_result[0][0][b][:beam_result[3][0][b].item()].tolist(),
-         beam_result[2][0][b][:beam_result[3][0][b].item()].tolist()) for b in range(beam_size)
-    ]
+    return [(beam_result[1][0][b].item(), beam_result[0][0][b][:beam_result[3][0][b].item()].tolist(),
+             beam_result[2][0][b][:beam_result[3][0][b].item()].tolist()) for b in range(beam_size)]

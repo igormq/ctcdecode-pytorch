@@ -7,7 +7,9 @@
 #include <string>
 #include <vector>
 
+#include "KenLM.h"
 #include "LM.h"
+#include "Tokenizer.h"
 #include "ctc_beam_search_decoder.h"
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder(const at::Tensor log_probs,
@@ -17,7 +19,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder(const at
                                                                         int num_processes,
                                                                         double cutoff_prob,
                                                                         int cutoff_top_n,
-                                                                        LMPtr lm);
+                                                                        LMPtr lm,
+                                                                        double alpha,
+                                                                        double beta);
 // int paddle_beam_decode(THFloatTensor *th_probs,
 //                        THIntTensor *th_seq_lens,
 //                        const char* labels,

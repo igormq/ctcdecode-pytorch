@@ -12,7 +12,7 @@ from multiprocessing.dummy import Pool
 ARGS = ['-O3', '-DNDEBUG', '-DKENLM_MAX_ORDER=20', '-Wno-unused-local-typedefs', '-Wno-sign-compare', '-std=c++11']
 
 if platform.system() == 'Darwin':
-    ARGS += ["-stdlib=libc++", "-mmacosx-version-min=10.7"]
+    ARGS += ["-stdlib=libc++", "-mmacosx-version-min=10.9"]
 
 INCLUDES = ['./', '../../third_party/kenlm', '../../third_party/openfst/src/include', '../../third_party/ThreadPool']
 

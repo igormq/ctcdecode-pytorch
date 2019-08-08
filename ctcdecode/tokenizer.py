@@ -1,94 +1,118 @@
 import torch
+from ctcdecode.csrc import _C
 
 
-class BaseTokenizer:
-    reserved_tokens = ['<blank>']
+Tokenizer = _C.Tokenizer
+# class CharTokenizer(_C.BaseTokenizer):
 
-    def __init__(self, vocab_file, ignored_tokens=[], allow_unknown=False):
-        self.ignored_tokens = ignored_tokens
-        self._token2idx = {}
+#     reserved_tokens = ['<blank>', '<space>']
 
-        if allow_unknown:
-            self.reserved_tokens += ['<unk>']
+#     def __init__(self, vocab_file, ignored_tokens=[], allow_unknown=False):
+#         super().__init__()
 
-        with open(vocab_file, 'r', encoding='utf8') as f:
-            for idx, line in enumerate(f):
-                c = line.strip().split(' ')[0]
+#         self.ignored_tokens = ignored_tokens
+#         self._entry2idx = {}
 
-                if c in self.ignored_tokens:
-                    print(f'Ignoring {c}')
-                    continue
+#         if allow_unknown:
+#             self.reserved_tokens += ['<unk>']
 
-                self._token2idx[c] = idx
+#         with open(vocab_file, 'r', encoding='utf8') as f:
+#             for idx, line in enumerate(f):
+#                 c = line.strip().split(' ')[0]
 
-        for t in self.reserved_tokens:
-            if t not in self._token2idx:
-                print(f'Token {t} not found. Defining it with index {len(self._token2idx)}')
-                self._token2idx[t] = len(self._token2idx)
+#                 if c in self.ignored_tokens:
+#                     print(f'Ignoring {c}')
+#                     continue
 
-        self._idx2token = {v: k for k, v in self._token2idx.items()}
-        self._len = len(self._token2idx)
+#                 self._entry2idx[c] = idx
 
-    def __len__(self):
-        return self._len
+#         for t in self.reserved_tokens:
+#             if t not in self._entry2idx:
+#                 print(f'Token {t} not found. Defining it with index {len(self._entry2idx)}')
+#                 self._entry2idx[t] = len(self._entry2idx)
 
-    def token2idx(self, tokens):
-        if '<unk>' in self._token2idx:
-            return [
-                self._token2idx.get(t, self._token2idx['<unk>']) for t in tokens
-            ]
+#         self._idx2entry = {v: k for k, v in self._entry2idx.items()}
 
-        return [
-            self._token2idx[t] for t in tokens
-        ]
+#     def __len__(self):
+#         return len(self._entry2idx)
 
-    def idx2token(self, token_ids, as_list=False, join=''):
-        if isinstance(token_ids, torch.Tensor):
-            token_ids = token_ids.tolist()
+#     def entry2idx(self, entry):
+#         if '<unk>' in self._entry2idx:
+#             return [self._entry2idx.get(t, self._entry2idx['<unk>']) for t in entry]
 
-        token_ids = list(map(lambda c: self._idx2token[c], token_ids))
+#         return [self._entry2idx[t] for t in entry]
 
-        if as_list:
-            return token_ids
+#     def idx2entry(self, idxs):
+#         if isinstance(idxs, torch.Tensor):
+#             idxs = idxs.tolist()
 
-        return join.join(token_ids)
+#         idxs = list(map(lambda c: self._idx2entry[c], idxs))
 
-    @property
-    def blank_idx(self):
-        return self._token2idx['<blank>']
+#         return ''.join(idxs)
 
-    @property
-    def space_idx(self):
-        return self._token2idx.get('<space>', None)
+#     @property
+#     def blank_idx(self):
+#         return self._entry2idx['<blank>']
 
+#     @property
+#     def space_idx(self):
+#         return self._entry2idx.get('<space>', None)
 
-class CharTokenizer(BaseTokenizer):
+#     def get_space_idx(self):
+#         return self.space_idx
 
-    reserved_tokens = ['<blank>', '<space>']
+#     def get_blank_idx(self):
+#         return self.blank_idx
 
-    def __init__(self, vocab_file, ignored_tokens=[], allow_unknown=False):
-        super().__init__(vocab_file, ignored_tokens, allow_unknown)
-
-    def token2idx(self, text):
-        chars = map(lambda x: x.replace(' ', '<space>'), list(text))
-        return super().token2idx(chars)
+#     def __del__(self):
+#         print('CharTokenizer foi embora')
 
 
-    def idx2token(self, token_ids, as_list=False):
-        out = super().idx2token(token_ids, as_list=as_list)
+#     def idx2token(self, token_ids, as_list=False, join=''):
+#         if isinstance(token_ids, torch.Tensor):
+#             token_ids = token_ids.tolist()
 
-        if as_list:
-            return out
+#         token_ids = list(map(lambda c: self._idx2entry[c], token_ids))
 
-        return out.replace('<space>', ' ')
+#         if as_list:
+#             return token_ids
 
-class WordTokenizer(BaseTokenizer):
-    def __init__(self, vocab_file, ignored_tokens=[], allow_unknown=False):
-        super().__init__(vocab_file, ignored_tokens, allow_unknown)
+#         return join.join(token_ids)
 
-    def token2idx(self, text):
-        words = text.split(' ')
-        return super().token2idx(words)
+#     @property
+#     def blank_idx(self):
+#         return self._entry2idx['<blank>']
 
-    def idx2token(self, token_ids, as_list=False):
-        return super().idx2token(token_ids, as_list=as_list, join=' ')
+#     @property
+#     def space_idx(self):
+#         return self._entry2idx.get('<space>', None)
+
+# class CharTokenizer(BaseTokenizer):
+
+#     reserved_tokens = ['<blank>', '<space>']
+
+#     def __init__(self, vocab_file, ignored_tokens=[], allow_unknown=False):
+#         super().__init__(vocab_file, ignored_tokens, allow_unknown)
+
+#     def token2idx(self, text):
+#         chars = map(lambda x: x.replace(' ', '<space>'), list(text))
+#         return super().token2idx(chars)
+
+#     def idx2token(self, token_ids, as_list=False):
+#         out = super().idx2token(token_ids, as_list=as_list)
+
+#         if as_list:
+#             return out
+
+#         return out.replace('<space>', ' ')
+
+# class WordTokenizer(BaseTokenizer):
+#     def __init__(self, vocab_file, ignored_tokens=[], allow_unknown=False):
+#         super().__init__(vocab_file, ignored_tokens, allow_unknown)
+
+#     def token2idx(self, text):
+#         words = text.split(' ')
+#         return super().token2idx(words)
+
+#     def idx2token(self, token_ids, as_list=False):
+#         return super().idx2token(token_ids, as_list=as_list, join=' ')

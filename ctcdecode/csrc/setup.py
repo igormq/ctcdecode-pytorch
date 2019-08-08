@@ -20,9 +20,9 @@ IS_LINUX = (platform.system() == 'Linux')
 if IS_LINUX:
     ext_libs = ['stdc++', 'rt']
 elif IS_DARWIN:
-    # ext_libs = ['c++']
-    ext_libs = []
-    ARGS += ["-stdlib=libc++", "-mmacosx-version-min=10.7"]
+    ext_libs = ['c++']
+    # ext_libs = []
+    ARGS += ["-stdlib=libc++", "-mmacosx-version-min=10.9"]
 else:
     ext_libs = []
 

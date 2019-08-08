@@ -6,6 +6,9 @@
 #include <utility>
 #include <vector>
 
+
+const float OOV_SCORE = -1000.0;
+
 /**
  * LMStatePtr is a shared void* tracking LM states generated during decoding.
  */
@@ -39,10 +42,6 @@ class LM {
   virtual void updateCache(std::vector<LMStatePtr> stateIdices) {}
 
   virtual ~LM() = default;
-
-  double alpha = 0.0;
-  double beta = 0.0;
-
 };
 
 using LMPtr = std::shared_ptr<LM>;

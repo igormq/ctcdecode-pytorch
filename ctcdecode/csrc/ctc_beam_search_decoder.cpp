@@ -15,7 +15,7 @@
 DecoderState *
 decoder_init(int blank_id,
              int class_dim,
-             const LMPtr &lm)
+             const LMPtr lm)
 {
 
   // assign special ids
@@ -29,14 +29,8 @@ decoder_init(int blank_id,
 
   if (lm != nullptr)
   {
-    std::cout << "cheguei" << std::endl;
-    std::cout << lm << std::endl;
-    // std::cout << lm->alpha << std::endl;
-    // std::cout << lm->beta << std::endl;
     auto lm_state_ptr = lm->start(0);
-    std::cout << "foi" << std::endl;
     root->lmState = lm_state_ptr;
-    std::cout << "saindo" << std::endl;
   }
 
   state->prefix_root = root;
@@ -60,7 +54,9 @@ void decoder_next(const float *log_probs,
                   double log_cutoff_prob,
                   size_t cutoff_top_n,
                   size_t beam_size,
-                  const LMPtr &lm)
+                  const LMPtr lm,
+                  double alpha,
+                  double beta)
 {
   // prefix search over time
   for (size_t rel_time_step = 0; rel_time_step < time_dim; ++rel_time_step, ++state->time_step)
@@ -77,7 +73,7 @@ void decoder_next(const float *log_probs,
           state->prefixes.begin(), state->prefixes.begin() + num_prefixes, prefix_compare);
 
       min_cutoff = state->prefixes[num_prefixes - 1]->score +
-                   log_prob[state->blank_id] - std::max(0.0, lm->beta);
+                   log_prob[state->blank_id] - std::max(0.0, beta);
       full_beam = (num_prefixes == beam_size);
     }
 
@@ -133,7 +129,7 @@ void decoder_next(const float *log_probs,
 
         if (lm_out.second > -NUM_FLT_INF)
         {
-          prefix_new->score_lm = prefix->score_lm + lm_out.second * lm->alpha + lm->beta;
+          prefix_new->score_lm = prefix->score_lm + lm_out.second * alpha + beta;
           prefix_new->lmState = lm_out.first;
         }
 
@@ -163,7 +159,7 @@ void decoder_next(const float *log_probs,
 
 std::vector<Output> decoder_decode(DecoderState *state,
                                    size_t beam_size,
-                                   const LMPtr &lm)
+                                   const LMPtr lm, double alpha, double beta)
 {
   std::vector<PathTrie *> prefixes_copy = state->prefixes;
   std::unordered_map<const PathTrie *, float> scores;
@@ -182,7 +178,7 @@ std::vector<Output> decoder_decode(DecoderState *state,
 
         lm_out = lm->finish(prefix->lmState);
         if (lm_out.second > -NUM_FLT_INF)
-          scores[prefix] += lm_out.second * lm->alpha + lm->beta;
+          scores[prefix] += lm_out.second * alpha + beta;
       }
     }
   }
@@ -202,12 +198,12 @@ std::vector<Output> ctc_beam_search_decoder(
     size_t beam_size,
     double log_cutoff_prob,
     size_t cutoff_top_n,
-    const LMPtr &lm)
+    const LMPtr lm, double alpha, double beta)
 {
 
   DecoderState *state = decoder_init(blank_id, class_dim, lm);
-  decoder_next(log_probs, state, time_dim, class_dim, log_cutoff_prob, cutoff_top_n, beam_size, lm);
-  std::vector<Output> out = decoder_decode(state, beam_size, lm);
+  decoder_next(log_probs, state, time_dim, class_dim, log_cutoff_prob, cutoff_top_n, beam_size, lm, alpha, beta);
+  std::vector<Output> out = decoder_decode(state, beam_size, lm, alpha, beta);
 
   delete state;
 
@@ -227,7 +223,7 @@ ctc_beam_search_decoder_batch(
     size_t num_processes,
     double log_cutoff_prob,
     size_t cutoff_top_n,
-    const LMPtr &lm)
+    const LMPtr lm, double alpha, double beta)
 {
   VALID_CHECK_GT(num_processes, 0, "num_processes must be nonnegative");
   VALID_CHECK_EQ(batch_size, seq_lengths_size, "must have one sequence length per batch element");
@@ -236,6 +232,10 @@ ctc_beam_search_decoder_batch(
 
   // enqueue the tasks of decoding
   std::vector<std::future<std::vector<Output>>> res;
+
+    // pybind11::gil_scoped_release nogil;
+
+  // std::vector<std::vector<Output>> res;
   for (size_t i = 0; i < batch_size; ++i)
   {
     res.emplace_back(pool.enqueue(ctc_beam_search_decoder,
@@ -246,14 +246,25 @@ ctc_beam_search_decoder_batch(
                                   beam_size,
                                   log_cutoff_prob,
                                   cutoff_top_n,
-                                  lm));
+                                  lm, alpha, beta));
+    // res.emplace_back(ctc_beam_search_decoder(
+    //                               &log_probs[i * time_dim * class_dim],
+    //                               seq_lengths[i],
+    //                               class_dim,
+    //                               blank_id,
+    //                               beam_size,
+    //                               log_cutoff_prob,
+    //                               cutoff_top_n,
+    //                               lm, alpha, beta));
   }
 
-  // get decoding results
+  // // get decoding results
   std::vector<std::vector<Output>> batch_results;
   for (size_t i = 0; i < batch_size; ++i)
   {
     batch_results.emplace_back(res[i].get());
+    // batch_results.emplace_back(res[i]);
   }
   return batch_results;
+  // return res;
 }
