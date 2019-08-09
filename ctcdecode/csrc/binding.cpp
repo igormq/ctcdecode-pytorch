@@ -52,7 +52,7 @@ class PyLM : public LM
     }
 };
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder(const at::Tensor log_probs,
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder_batch(const at::Tensor log_probs,
                                                                         const at::Tensor seq_lengths,
                                                                         int blank_id,
                                                                         int beam_size,
@@ -103,6 +103,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder(const at
         for (int p = 0; p < results.size(); ++p)
         {
             Output out = results[p];
+            
             auto output_tokens = out.tokens;
             auto output_timesteps = out.timesteps;
             for (int t = 0; t < output_tokens.size(); ++t)
@@ -158,5 +159,5 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
             "tokenizer"_a, "unit"_a = KenLMUnit::Word)
         .def_readwrite("unit", &KenLM::unit);
 
-    m.def("beam_decoder", &beam_decoder, "beam_decoder");
+    m.def("beam_decoder_batch", &beam_decoder_batch, "beam_decoder_batch");
 }

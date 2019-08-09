@@ -29,13 +29,13 @@ def ctc_greedy_decoder(log_probs_seq, blank=0):
 
 
 @torch.no_grad()
-def ctc_beam_search_decoder(log_probs_seq, lm_scorer=None, beam_size=100, blank=0, cutoff_prob=1.0, cutoff_top_n=40, alpha=0.0, beta=0.0):
+def ctc_beam_search_decoder(log_probs_seq, seq_lengths=None, lm=None, beam_size=100, blank=0, cutoff_prob=1.0, cutoff_top_n=40, alpha=0.0, beta=0.0, num_processes=1):
     """
     Performs prefix beam search on the output of a CTC network.
 
     Args:
-        log_probs_seq (tensor): The log probabilities. Should be a 2D array (timesteps x alphabet_size)
-        lm_scorer (func): Language model function. Should take as input a string and output a
+        log_probs_seq (tensor): The log probabilities. Should be a 3D array (batch_size x timesteps x alphabet_size)
+        lm (func): Language model function. Should take as input a string and output a
             probability.
         beam_size (int): The beam width. Will keep the `beam_size` most likely candidates at each
             timestep.
@@ -46,13 +46,17 @@ def ctc_beam_search_decoder(log_probs_seq, lm_scorer=None, beam_size=100, blank=
     Retruns:
         string: The decoded CTC output.
     """
-    log_probs_seq = log_probs_seq.unsqueeze(0).float()
-    seq_lengths = torch.tensor([log_probs_seq.shape[1]], dtype=torch.int32)
-    num_processes = 1
+    log_probs_seq = log_probs_seq.float()
 
-    # print(log_probs_seq.view(-1)[0], log_probs_seq.view(-1)[1])
-    beam_result = _C.beam_decoder(log_probs_seq, seq_lengths, blank, beam_size, num_processes, cutoff_prob,
-                                  cutoff_top_n, lm_scorer, alpha, beta)
+    if not seq_lengths:
+        batch_size = log_probs_seq.shape[0]
+        max_time = log_probs_seq.shape[1]
+        seq_lengths = torch.tensor([max_time for _ in range(batch_size)], dtype=torch.int)
+    
+    seq_lengths = seq_lengths.int()
+
+    beam_result = _C.beam_decoder_batch(log_probs_seq, seq_lengths, blank, beam_size, num_processes, cutoff_prob,
+                                  cutoff_top_n, lm, alpha, beta)
 
     return [(beam_result[1][0][b].item(), beam_result[0][0][b][:beam_result[3][0][b].item()].tolist(),
              beam_result[2][0][b][:beam_result[3][0][b].item()].tolist()) for b in range(beam_size)]

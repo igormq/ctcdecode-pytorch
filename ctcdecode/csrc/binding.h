@@ -12,7 +12,7 @@
 #include "Tokenizer.h"
 #include "ctc_beam_search_decoder.h"
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder(const at::Tensor log_probs,
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder_batch(const at::Tensor log_probs,
                                                                         const at::Tensor seq_lengths,
                                                                         int blank_id,
                                                                         int beam_size,

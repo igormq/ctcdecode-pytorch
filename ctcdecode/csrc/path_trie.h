@@ -33,7 +33,7 @@ public:
                          size_t max_steps = std::numeric_limits<size_t>::max());
 
   // update log probs
-  void iterate_to_vec(std::vector<PathTrie*>& output);
+  void iterate_to_vec(std::vector<PathTrie*>& output, bool has_lm);
 
   // set dictionary for FST
   void set_dictionary(FstType* dictionary);

@@ -9,7 +9,9 @@
 #include "decoder_utils.h"
 #include "ThreadPool.h"
 #include "fst/fstlib.h"
+#include "KenLM.h"
 #include "path_trie.h"
+
 
 DecoderState *
 decoder_init(int blank_id,
@@ -24,12 +26,11 @@ decoder_init(int blank_id,
 
   // init prefixes' root
   PathTrie *root = new PathTrie;
-  root->score = root->p_b = 0.0;
+  root->score = root->score_ctc = root->score_lm = root->p_b = 0.0;
 
   if (lm != nullptr)
   {
     auto lm_state_ptr = lm->start(0);
-    std::cout << lm_state_ptr << std::endl;
     root->lmState = lm_state_ptr;
   }
 
@@ -63,7 +64,7 @@ void decoder_next(const float *log_probs,
   {
     auto *log_prob = &log_probs[rel_time_step * class_dim];
 
-    float min_cutoff = -NUM_FLT_MIN;
+    float min_cutoff = -NUM_FLT_INF;
     bool full_beam = false;
 
     if (lm != nullptr)
@@ -95,7 +96,7 @@ void decoder_next(const float *log_probs,
         if (c == state->blank_id)
         {
           prefix->n_p_b =
-              log_sum_exp(prefix->n_p_b, log_prob_c + prefix->score);
+              log_sum_exp(prefix->n_p_b, log_prob_c + prefix->score_ctc);
           continue;
         }
 
@@ -110,12 +111,12 @@ void decoder_next(const float *log_probs,
         if (prefix_new == nullptr)
           continue;
 
-        float log_p = -NUM_FLT_MIN;
+        float log_p = -NUM_FLT_INF;
 
-        if (c == prefix->character && prefix->p_b > -NUM_FLT_MIN)
+        if (c == prefix->character && prefix->p_b > -NUM_FLT_INF)
           log_p = log_prob_c + prefix->p_b;
         else if (c != prefix->character)
-          log_p = log_prob_c + prefix->score;
+          log_p = log_prob_c + prefix->score_ctc;
 
         prefix_new->n_p_nb =
             log_sum_exp(prefix_new->n_p_nb, log_p);
@@ -124,20 +125,42 @@ void decoder_next(const float *log_probs,
         if (lm == nullptr)
           continue;
 
-        std::pair<LMStatePtr, float> lm_out;
-        lm_out = lm->score(prefix->lmState, prefix_new->character);
+        auto lm_out = lm->score(prefix->lmState, prefix_new->character);
+
+        // int lmCmp = lm_->compareState(prefix_new->lmState, lm_out->first);
+
+        // if (lmCmp != 0) {
+        //   // diff state
+        //   if (lmCmp > 0) //actual state is better
+        //     continue;
+
+        //   prefix_new->lmState = lm_out.first;
+        //   prefix_new->score_lm = prefix->score_lm;
+        //   if (lm_out.second <= 0.0)
+        //     prefix_new->score_lm += lm_out.second * alpha + beta;
+
+        // } else {
+        //   // same state
+        //   if (prefix_new->score_lm > prefix->score_lm + lm_out.second * alpha + beta) {
+        //     // nothing to do here
+        //     continue;
+        //   }
+        //   prefix_new->score_lm = prefix->score_lm + lm_out.second * alpha + beta;
+        // }
+        //   if (prefix_new->lmState.get() != nullptr) {
+        //   delete prefix_new->lmState.get();
+        // }
 
         prefix_new->lmState = lm_out.first;
-        if (lm_out.second > -NUM_FLT_MIN)
-        {
-          prefix_new->score_lm = prefix->score_lm + lm_out.second * alpha + beta;
-        }
+        prefix_new->score_lm = prefix->score_lm;
+        if (lm_out.second <= 0.0)
+          prefix_new->score_lm += lm_out.second * alpha + beta;
       } // end of loop over prefix
     }   // end of loop over vocabulary
 
     // update log log_probs
     state->prefixes.clear();
-    state->prefix_root->iterate_to_vec(state->prefixes);
+    state->prefix_root->iterate_to_vec(state->prefixes, (lm != nullptr));
 
     // only preserve top beam_size prefixes
     if (state->prefixes.size() >= beam_size)
@@ -173,10 +196,8 @@ std::vector<Output> decoder_decode(DecoderState *state,
       auto prefix = prefixes_copy[i];
       if (!prefix->is_empty())
       {
-        std::pair<LMStatePtr, float> lm_out;
-
-        lm_out = lm->finish(prefix->lmState);
-        if (lm_out.second > -NUM_FLT_MIN)
+        auto lm_out = lm->finish(prefix->lmState);
+        if (lm_out.second <= 0.0)
           scores[prefix] += lm_out.second * alpha + beta;
       }
     }

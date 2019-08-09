@@ -49,7 +49,7 @@ std::pair<LMStatePtr, float> KenLM::score(
     const LMStatePtr &state,
     const int token_index)
 {
-
+  float score;
   auto inState = getRawState(state);
   auto outState = std::make_shared<KenLMState>();
 
@@ -57,7 +57,7 @@ std::pair<LMStatePtr, float> KenLM::score(
   {
     *outState = *inState;
     outState->tokens.push_back(token_index);
-    return std::make_pair(std::move(outState), -NUM_FLT_MIN);
+    return std::make_pair(std::move(outState), 1); // return an invalid prob, then decoder will take care
   }
 
   std::string entry;
@@ -72,16 +72,17 @@ std::pair<LMStatePtr, float> KenLM::score(
     entry = tokenizer_->getEntry(token_index);
   }
 
-  float score;
+  auto lm_token_index = vocab_->Index(entry);
 
-  if (vocab_->Index(entry) == 0)
+  if (lm_token_index == 0)
   {
     score = OOV_SCORE;
   }
   else
   {
+    // Some bug here
     score =
-      model_->BaseScore(&inState->state, vocab_->Index(entry), &outState->state) / NUM_FLT_LOGE;
+      model_->BaseScore(&inState->state, lm_token_index, &outState->state) / NUM_FLT_LOGE;
   }
 
 
@@ -91,16 +92,16 @@ std::pair<LMStatePtr, float> KenLM::score(
 std::pair<LMStatePtr, float> KenLM::finish(const LMStatePtr &state)
 {
   auto inState = getRawState(state);
+  auto outState = std::make_shared<KenLMState>();
   float score = 0.0;
 
   if (unit == KenLMUnit::Word && inState->tokens.size() > 0)
   {
     auto output = KenLM::score(state, tokenizer_->getSpaceIndex());
-    inState = getRawState(output.first);
+    auto inState = getRawState(output.first);
     score += output.second;
   }
 
-  auto outState = std::make_shared<KenLMState>();
   score +=
       model_->BaseScore(&inState->state, vocab_->EndSentence(), &outState->state);
 

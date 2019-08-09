@@ -26,8 +26,8 @@ if os.environ.get('DEBUG', '0') == '1':
     extra_compile_args = ['-O0', '-g']
 
 extra_compile_args += [
-    '-DNDEBUG', '-DKENLM_MAX_ORDER=20', '-Wno-unused-local-typedefs', '-Wno-sign-compare',
-    '-std=c++11', '-w', '-DINCLUDE_KENLM'
+    '-DNDEBUG', '-DKENLM_MAX_ORDER=20', '-Wno-unused-local-typedefs', '-Wno-sign-compare', '-std=c++11', '-w',
+    '-DINCLUDE_KENLM'
 ]
 
 if platform.system() == 'Linux':
@@ -37,28 +37,26 @@ elif platform.system() == 'Darwin':
     libraries += ['c++']
 
 include_dirs = [
-    '../../third_party/kenlm', '../../third_party/openfst/src/include',
-    '../../third_party/ThreadPool', '../../third_party/boost'
+    '../../third_party/kenlm', '../../third_party/openfst/src/include', '../../third_party/ThreadPool',
+    '../../third_party/boost'
 ]
 
-sources = (glob.glob('../../third_party/kenlm/util/*.cc') +
-           glob.glob('../../third_party/kenlm/lm/*.cc') +
+sources = (glob.glob('../../third_party/kenlm/util/*.cc') + glob.glob('../../third_party/kenlm/lm/*.cc') +
            glob.glob('../../third_party/kenlm/util/double-conversion/*.cc'))
 
 sources += glob.glob('../../third_party/openfst/src/lib/*.cc')
 
-sources = [
-    fn for fn in sources
-    if not (fn.endswith('main.cc') or fn.endswith('test.cc') or fn.endswith('unittest.cc'))
-]
-sources += glob.glob('*.cpp')
+sources = [fn for fn in sources if not (fn.endswith('main.cc') or fn.endswith('test.cc') or fn.endswith('unittest.cc'))]
+
+sources = glob.glob('*.cpp')
 
 decoder_module = CppExtension(name='_C',
                               sources=sources,
                               language='c++',
                               include_dirs=include_dirs + ['./'],
                               extra_compile_args=extra_compile_args,
-                              libraries=libraries)
+                              libraries=libraries,
+                              extra_link_args=[common_build])
 
 setup(name='ds_ctcdecoder',
       version=project_version,

@@ -32,9 +32,11 @@ class Vocabulary;
 struct KenLMState
 {
   lm::ngram::State state;
+  // WordIndex words[KENLM_MAX_ORDER - 1];
+  //   float backoff[KENLM_MAX_ORDER - 1];
+  //   unsigned char length;
+  // typedef unsigned int WordIndex;
   std::vector<int> tokens;
-
-  KenLMState() {}
 };
 
 enum KenLMUnit

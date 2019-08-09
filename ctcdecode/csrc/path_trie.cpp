@@ -16,7 +16,7 @@ PathTrie::PathTrie()
   n_p_nb = -NUM_FLT_INF;
   log_prob_c = -NUM_FLT_INF;
   score_ctc = -NUM_FLT_INF;
-  score_lm = 0.0;
+  score_lm = -NUM_FLT_INF;
   score = -NUM_FLT_INF;
 
   ROOT_ = -1;
@@ -153,7 +153,7 @@ PathTrie *PathTrie::get_path_vec(std::vector<int> &output,
   }
 }
 
-void PathTrie::iterate_to_vec(std::vector<PathTrie *> &output)
+void PathTrie::iterate_to_vec(std::vector<PathTrie *> &output, bool has_lm)
 {
   if (exists_)
   {
@@ -164,12 +164,24 @@ void PathTrie::iterate_to_vec(std::vector<PathTrie *> &output)
     n_p_nb = -NUM_FLT_INF;
 
     score_ctc = log_sum_exp(p_b, p_nb);
-    score = score_ctc + score_lm;
+    score = score_ctc;
+
+    // preventing underflow
+    if (has_lm && score > -NUM_FLT_INF) {
+      // preventing underflow
+      if (score_lm == -NUM_FLT_INF) {
+        score = -NUM_FLT_INF;
+      }
+      else {
+      score += score_lm;
+      }
+    }
+
     output.push_back(this);
   }
   for (auto child : children_)
   {
-    child.second->iterate_to_vec(output);
+    child.second->iterate_to_vec(output, has_lm);
   }
 }
 

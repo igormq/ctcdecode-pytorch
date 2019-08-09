@@ -11,47 +11,20 @@ from multiprocessing.dummy import Pool
 
 from torch.utils.cpp_extension import include_paths
 
-ARSG = ['-O3']
-if os.environ.get('DEBUG', '0') == '1':
-    ARGS = ['-O0', '-g']
 
-ARGS += [
-    '-DNDEBUG', '-DKENLM_MAX_ORDER=20', '-Wno-unused-local-typedefs', '-Wno-sign-compare',
-    '-std=c++11',
-    '-w', '-DINCLUDE_KENLM'
-]
-
-LIBS = []
-if platform.system() == 'Linux':
-    LIBS += ['stdc++', 'rt']
-elif platform.system() == 'Darwin':
-    ARGS += ["-stdlib=libc++", "-mmacosx-version-min=10.9"]
-    LIBS += ['c++']
-
-INCLUDES = [
-    '../../third_party/kenlm', '../../third_party/openfst/src/include',
-    '../../third_party/ThreadPool', '../../third_party/boost'
-]
-
-COMMON_FILES = (glob.glob('../../third_party/kenlm/util/*.cc') +
-                glob.glob('../../third_party/kenlm/lm/*.cc') +
-                glob.glob('../../third_party/kenlm/util/double-conversion/*.cc'))
-
-COMMON_FILES += glob.glob('../../third_party/openfst/src/lib/*.cc')
-
-COMMON_FILES = [
-    fn for fn in COMMON_FILES
-    if not (fn.endswith('main.cc') or fn.endswith('test.cc') or fn.endswith('unittest.cc'))
-]
-
-
-def build_common(out_name='common.a', build_dir='temp_build/temp_build', num_parallel=1):
+def build_common(common_files,
+                 includes,
+                 args,
+                 libs,
+                 out_name='common.a',
+                 build_dir='temp_build/temp_build',
+                 num_parallel=1):
     compiler = os.environ.get('CXX', 'g++')
     ar = os.environ.get('AR', 'ar')
     libtool = os.environ.get('LIBTOOL', 'libtool')
     cflags = os.environ.get('CFLAGS', '') + os.environ.get('CXXFLAGS', '')
 
-    for file in COMMON_FILES:
+    for file in common_files:
         outfile = os.path.join(build_dir, os.path.splitext(file)[0] + '.o')
         outdir = os.path.dirname(outfile)
         if not os.path.exists(outdir):
@@ -66,10 +39,10 @@ def build_common(out_name='common.a', build_dir='temp_build/temp_build', num_par
         cmd = '{cc} -fPIC -c {cflags} {args} {includes} {infile} -o {outfile} {libs}'.format(
             cc=compiler,
             cflags=cflags,
-            args=' '.join(ARGS),
-            includes=' '.join('-I' + i for i in INCLUDES + include_paths()),
+            args=' '.join(args),
+            includes=' '.join('-I' + i for i in includes + include_paths()),
             infile=file,
-            libs=' '.join('-l' + l for l in LIBS),
+            libs=' '.join('-l' + l for l in libs),
             outfile=outfile,
         )
         print(cmd)
@@ -77,7 +50,7 @@ def build_common(out_name='common.a', build_dir='temp_build/temp_build', num_par
         return outfile
 
     pool = Pool(num_parallel)
-    obj_files = list(pool.imap_unordered(build_one, COMMON_FILES))
+    obj_files = list(pool.imap_unordered(build_one, common_files))
 
     if sys.platform.startswith('darwin'):
         cmd = '{libtool} -static -o {outfile} {infiles}'.format(
@@ -88,12 +61,6 @@ def build_common(out_name='common.a', build_dir='temp_build/temp_build', num_par
         print(cmd)
         subprocess.check_call(shlex.split(cmd))
     else:
-        cmd = '{ar} rcs {outfile} {infiles}'.format(ar=ar,
-                                                    outfile=out_name,
-                                                    infiles=' '.join(obj_files))
+        cmd = '{ar} rcs {outfile} {infiles}'.format(ar=ar, outfile=out_name, infiles=' '.join(obj_files))
         print(cmd)
         subprocess.check_call(shlex.split(cmd))
-
-
-if __name__ == '__main__':
-    build_common()
