@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 #include <lm/model.hh>
+
 #include "decoder_utils.h"
 
 KenLM::KenLM(const std::string &path, const Tokenizer &tokenizer, KenLMUnit unit)
