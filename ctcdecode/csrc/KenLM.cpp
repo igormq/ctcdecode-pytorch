@@ -7,7 +7,7 @@
 
 #include "decoder_utils.h"
 
-KenLM::KenLM(const std::string &path, const Tokenizer &tokenizer, KenLMUnit unit)
+KenLM::KenLM(const std::string &path, const Tokenizer &tokenizer, LMUnit unit) : unit(unit), tokenizer_(&tokenizer)
 {
   const char *filename = path.c_str();
   VALID_CHECK_EQ(access(filename, F_OK), 0, "[KenLM] Invalid language model path");
@@ -24,9 +24,6 @@ KenLM::KenLM(const std::string &path, const Tokenizer &tokenizer, KenLMUnit unit
   {
     throw std::runtime_error("[KenLM] LM vocabulary loading failed.");
   }
-
-  unit = unit;
-  tokenizer_ = &tokenizer;
 }
 
 LMStatePtr KenLM::start(bool startWithNothing)
@@ -49,19 +46,19 @@ std::pair<LMStatePtr, float> KenLM::score(
     const LMStatePtr &state,
     const int token_index)
 {
+  std::string entry = "";
   float score;
   auto inState = getRawState(state);
   auto outState = std::make_shared<KenLMState>();
 
-  if (unit == KenLMUnit::Word && token_index != tokenizer_->getSpaceIndex())
+  if ( unit == LMUnit::Word && token_index != tokenizer_->getSpaceIndex())
   {
-    *outState = *inState;
+    *outState = *inState; // copy struct
     outState->tokens.push_back(token_index);
     return std::make_pair(std::move(outState), 1); // return an invalid prob, then decoder will take care
   }
-
-  std::string entry;
-  if (unit == KenLMUnit::Word)
+  
+  if (unit == LMUnit::Word)
   {
     auto entries = tokenizer_->mapIndicesToEntries(inState->tokens);
     for (const auto &piece : entries)
@@ -85,7 +82,6 @@ std::pair<LMStatePtr, float> KenLM::score(
       model_->BaseScore(&inState->state, lm_token_index, &outState->state) / NUM_FLT_LOGE;
   }
 
-
   return std::make_pair(std::move(outState), score);
 }
 
@@ -95,10 +91,10 @@ std::pair<LMStatePtr, float> KenLM::finish(const LMStatePtr &state)
   auto outState = std::make_shared<KenLMState>();
   float score = 0.0;
 
-  if (unit == KenLMUnit::Word && inState->tokens.size() > 0)
+  if (unit == LMUnit::Word && inState->tokens.size() > 0)
   {
     auto output = KenLM::score(state, tokenizer_->getSpaceIndex());
-    auto inState = getRawState(output.first);
+    inState = getRawState(output.first);
     score += output.second;
   }
 

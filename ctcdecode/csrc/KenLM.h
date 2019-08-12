@@ -39,19 +39,13 @@ struct KenLMState
   std::vector<int> tokens;
 };
 
-enum KenLMUnit
-{
-  Word = 0,
-  Char
-};
-
 /**
  * KenLM extends LM by using the toolkit https://kheafield.com/code/kenlm/.
  */
 class KenLM : public LM
 {
 public:
-  KenLM(const std::string &path, const Tokenizer &tokenizer, KenLMUnit unit);
+  KenLM(const std::string &path, const Tokenizer &tokenizer, LMUnit unit);
 
   LMStatePtr start(bool startWithNothing) override;
 
@@ -64,7 +58,7 @@ public:
   int compareState(const LMStatePtr &state1, const LMStatePtr &state2)
       const override;
 
-  KenLMUnit unit;
+  LMUnit unit;
   const Tokenizer *tokenizer_;
 
 private:

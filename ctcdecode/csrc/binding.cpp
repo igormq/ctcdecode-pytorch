@@ -148,15 +148,16 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         .def("idxs2entries", &Tokenizer::mapIndicesToEntries, "indices"_a)
         .def("is_contiguous", &Tokenizer::isContiguous);
 
-    py::enum_<KenLMUnit>(m, "KenLMUnit")
-        .value("Word", KenLMUnit::Word)
-        .value("Char", KenLMUnit::Char);
+    py::enum_<LMUnit>(m, "LMUnit", py::arithmetic())
+        .value("Word", LMUnit::Word)
+        .value("Char", LMUnit::Char)
+        .export_values();
 
     py::class_<KenLM, KenLMPtr, LM>(m, "KenLM")
         .def(
-            py::init<const std::string &, const Tokenizer &, KenLMUnit>(),
+            py::init<const std::string &, const Tokenizer &, LMUnit>(),
             "path"_a,
-            "tokenizer"_a, "unit"_a = KenLMUnit::Word)
+            "tokenizer"_a, "unit"_a = LMUnit::Word)
         .def_readwrite("unit", &KenLM::unit);
 
     m.def("beam_decoder_batch", &beam_decoder_batch, "beam_decoder_batch");

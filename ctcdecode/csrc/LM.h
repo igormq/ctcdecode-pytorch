@@ -9,6 +9,12 @@
 
 const float OOV_SCORE = -1000.0;
 
+enum LMUnit
+{
+  Word = 0,
+  Char
+};
+
 /**
  * LMStatePtr is a shared void* tracking LM states generated during decoding.
  */

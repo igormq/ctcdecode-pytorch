@@ -30,8 +30,7 @@ decoder_init(int blank_id,
 
   if (lm != nullptr)
   {
-    auto lm_state_ptr = lm->start(0);
-    root->lmState = lm_state_ptr;
+    root->lmState = lm->start(0);
   }
 
   state->prefix_root = root;
