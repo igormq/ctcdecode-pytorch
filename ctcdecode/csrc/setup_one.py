@@ -48,7 +48,7 @@ sources += glob.glob('../../third_party/openfst/src/lib/*.cc')
 
 sources = [fn for fn in sources if not (fn.endswith('main.cc') or fn.endswith('test.cc') or fn.endswith('unittest.cc'))]
 
-sources = glob.glob('*.cpp')
+sources += glob.glob('*.cpp')
 
 decoder_module = CppExtension(name='_C',
                               sources=sources,
