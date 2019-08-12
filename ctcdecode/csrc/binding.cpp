@@ -63,8 +63,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder_batch(co
                                                                         double alpha,
                                                                         double beta)
 {
-    AT_ASSERT(log_probs.is_contiguous())
-    AT_ASSERT(seq_lengths.is_contiguous())
+    AT_ASSERT(log_probs.is_contiguous());
+    AT_ASSERT(seq_lengths.is_contiguous());
 
     const int64_t batch_size = log_probs.size(0);
     const int64_t max_time = log_probs.size(1);

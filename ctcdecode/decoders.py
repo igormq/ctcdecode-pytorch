@@ -19,7 +19,7 @@ def ctc_greedy_decoder(log_probs_seq, blank=0):
     max_probs, max_indexes = torch.max(log_probs_seq, 1)
     # remove consecutive duplicate indexes
     mask = torch.cat([
-        torch.tensor([1], dtype=torch.uint8, device=log_probs_seq.device),
+        torch.tensor([True], dtype=torch.bool, device=log_probs_seq.device),
         ((max_indexes[:-1] - max_indexes[1:]).abs() > 0)
     ])
     # remove blank indexes
