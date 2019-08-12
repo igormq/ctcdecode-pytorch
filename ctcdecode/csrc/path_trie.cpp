@@ -78,6 +78,7 @@ PathTrie *PathTrie::get_path_trie(int new_char, int new_timestep, float cur_log_
         // Adding this character causes word outside dictionary
         auto FSTZERO = fst::TropicalWeight::Zero();
         auto final_weight = dictionary_->Final(dictionary_state_);
+
         bool is_final = (final_weight != FSTZERO);
         if (is_final && reset)
         {
@@ -211,14 +212,10 @@ void PathTrie::remove()
   }
 }
 
-void PathTrie::set_dictionary(PathTrie::FstType *dictionary)
+void PathTrie::setup_trie(LM::FstType *dictionary)
 {
   dictionary_ = dictionary;
   dictionary_state_ = dictionary->Start();
   has_dictionary_ = true;
-}
-
-void PathTrie::set_matcher(std::shared_ptr<fst::SortedMatcher<FstType>> matcher)
-{
-  matcher_ = matcher;
+  matcher_ = std::make_shared<fst::SortedMatcher<LM::FstType>>(*dictionary, fst::MATCH_INPUT);
 }

@@ -10,10 +10,12 @@
 
 #include <limits>
 
-#include "Tokenizer.h"
 #include "LM.h"
 
+#include <lm/enumerate_vocab.hh>
+#include <lm/word_index.hh>
 #include <lm/state.hh>
+#include <util/string_piece.hh>
 
 // KenLM forward declarations
 namespace lm
@@ -28,6 +30,18 @@ class Vocabulary;
 // class State;
 // } // namespace ngram
 } // namespace lm
+
+// Implement a callback to retrieve the dictionary of language model.
+class RetrieveStrEnumerateVocab : public lm::EnumerateVocab {
+public:
+  RetrieveStrEnumerateVocab() {}
+
+  void Add(lm::WordIndex index, const StringPiece &str) {
+    vocabulary.push_back(std::string(str.data(), str.length()));
+  }
+
+  std::vector<std::string> vocabulary;
+};
 
 struct KenLMState
 {
@@ -45,7 +59,7 @@ struct KenLMState
 class KenLM : public LM
 {
 public:
-  KenLM(const std::string &path, const Tokenizer &tokenizer, LMUnit unit);
+  KenLM(const std::string &path, const Tokenizer &tokenizer, const std::string& trie_path = nullptr, LMUnit unit = LMUnit::Word, bool build_trie = false);
 
   LMStatePtr start(bool startWithNothing) override;
 
@@ -57,9 +71,6 @@ public:
 
   int compareState(const LMStatePtr &state1, const LMStatePtr &state2)
       const override;
-
-  LMUnit unit;
-  const Tokenizer *tokenizer_;
 
 private:
   std::shared_ptr<lm::base::Model> model_;

@@ -7,13 +7,24 @@
 
 #include "decoder_utils.h"
 
-KenLM::KenLM(const std::string &path, const Tokenizer &tokenizer, LMUnit unit) : unit(unit), tokenizer_(&tokenizer)
+static const int32_t MAGIC = 'TRIE';
+static const int32_t FILE_VERSION = 4;
+
+KenLM::KenLM(const std::string &path, const Tokenizer &tokenizer, const std::string& trie_path, LMUnit unit, bool build_trie) : LM(tokenizer, unit)
 {
+  bool has_trie = trie_path.size() && access(trie_path.c_str(), R_OK) == 0;
+  lm::ngram::Config config;
+
   const char *filename = path.c_str();
   VALID_CHECK_EQ(access(filename, F_OK), 0, "[KenLM] Invalid language model path");
 
+  if (!has_trie && build_trie) { // no trie was specified, build it now
+    RetrieveStrEnumerateVocab enumerate;
+    config.enumerate_vocab = &enumerate;
+  }
+
   // Load LM
-  model_.reset(lm::ngram::LoadVirtual(filename));
+  model_.reset(lm::ngram::LoadVirtual(filename, config));
   if (!model_)
   {
     throw std::runtime_error("[KenLM] LM loading failed.");
@@ -23,6 +34,13 @@ KenLM::KenLM(const std::string &path, const Tokenizer &tokenizer, LMUnit unit) :
   if (!vocab_)
   {
     throw std::runtime_error("[KenLM] LM vocabulary loading failed.");
+  }
+
+  if (has_trie) {
+    loadTrie(trie_path);
+  }
+  else if (build_trie) {
+    setupTrie(static_cast<RetrieveStrEnumerateVocab*>(config.enumerate_vocab)->vocabulary);
   }
 }
 

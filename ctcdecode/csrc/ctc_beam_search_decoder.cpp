@@ -37,12 +37,10 @@ decoder_init(int blank_id,
 
   state->prefixes.push_back(root);
 
-  // if (lm != nullptr && !lm->is_character_based()) {
-  //   auto dict_ptr = lm->dictionary->Copy(true);
-  //   root->set_dictionary(dict_ptr);
-  //   auto matcher = std::make_shared<fst::SortedMatcher<PathTrie::FstType>>(*dict_ptr, fst::MATCH_INPUT);
-  //   root->set_matcher(matcher);
-  // }
+  if (lm != nullptr && lm->hasTrie()) {
+    auto dict_ptr = lm->getTrie()->Copy(true);
+    root->setup_trie(dict_ptr);
+  }
 
   return state;
 }

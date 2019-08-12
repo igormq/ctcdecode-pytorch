@@ -29,7 +29,16 @@ def ctc_greedy_decoder(log_probs_seq, blank=0):
 
 
 @torch.no_grad()
-def ctc_beam_search_decoder(log_probs_seq, seq_lengths=None, lm=None, beam_size=100, blank=0, cutoff_prob=1.0, cutoff_top_n=40, alpha=0.0, beta=0.0, num_processes=1):
+def ctc_beam_search_decoder(log_probs_seq,
+                            seq_lengths=None,
+                            lm=None,
+                            beam_size=100,
+                            blank=0,
+                            cutoff_prob=1.0,
+                            cutoff_top_n=40,
+                            alpha=0.0,
+                            beta=0.0,
+                            num_processes=1):
     """
     Performs prefix beam search on the output of a CTC network.
 
@@ -46,17 +55,40 @@ def ctc_beam_search_decoder(log_probs_seq, seq_lengths=None, lm=None, beam_size=
     Retruns:
         string: The decoded CTC output.
     """
-    log_probs_seq = log_probs_seq.float()
+    batch_size = 1
+    if isinstance(log_probs_seq, (list, tuple)):
+        batch_size = len(log_probs_seq)
+        seq_lengths = torch.tensor([p.shape[0] for p in log_probs_seq])
+        log_probs_seq = torch.nn.utils.rnn.pad_sequence(log_probs_seq, batch_first=True)
+    elif isinstance(log_probs_seq, torch.Tensor):
+        if log_probs_seq.dim() == 3:
+            if seq_lengths is None:
+                batch_size = log_probs_seq.shape[0]
+                max_time = log_probs_seq.shape[1]
+                seq_lengths = torch.tensor([max_time for _ in range(batch_size)], dtype=torch.int)
+        elif log_probs_seq.dim() == 2:
+            if seq_lengths is None:
+                seq_lengths = torch.tensor([log_probs_seq.shape[0]])
+            log_probs_seq = log_probs_seq.unsqueeze(0)
+        else:
+            raise ValueError("Invalid param `log_probs_seq`")
+    else:
+        raise ValueError("Param `log_probs_seq` must be a list of 2D tensors or a 3D tensor.")
 
-    if not seq_lengths:
-        batch_size = log_probs_seq.shape[0]
-        max_time = log_probs_seq.shape[1]
-        seq_lengths = torch.tensor([max_time for _ in range(batch_size)], dtype=torch.int)
-    
+    log_probs_seq = log_probs_seq.float()
     seq_lengths = seq_lengths.int()
 
-    beam_result = _C.beam_decoder_batch(log_probs_seq, seq_lengths, blank, beam_size, num_processes, cutoff_prob,
-                                  cutoff_top_n, lm, alpha, beta)
+    print(log_probs_seq.shape)
+    print(seq_lengths)
 
-    return [(beam_result[1][0][b].item(), beam_result[0][0][b][:beam_result[3][0][b].item()].tolist(),
-             beam_result[2][0][b][:beam_result[3][0][b].item()].tolist()) for b in range(beam_size)]
+    beam_result = _C.beam_decoder_batch(log_probs_seq, seq_lengths, blank, beam_size, num_processes, cutoff_prob,
+                                        cutoff_top_n, lm, alpha, beta)
+
+    out = [[(beam_result[1][b][k].item(), beam_result[0][b][k][:beam_result[3][b][k].item()].tolist(),
+             beam_result[2][b][k][:beam_result[3][b][k].item()].tolist()) for k in range(beam_size)]
+           for b in range(batch_size)]
+
+    if batch_size > 1:
+        return out
+
+    return out[0]

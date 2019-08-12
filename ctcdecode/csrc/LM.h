@@ -5,6 +5,9 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <fst/fstlib.h>
+
+#include "Tokenizer.h"
 
 
 const float OOV_SCORE = -1000.0;
@@ -25,7 +28,12 @@ using LMStatePtr = std::shared_ptr<void>;
  * here which can be shared for KenLM, ConvLM, RNNLM, etc.
  */
 class LM {
+
  public:
+
+  LM(const Tokenizer &tokenizer, LMUnit unit) : tokenizer_(&tokenizer), unit(unit) {};
+
+  using FstType = fst::ConstFst<fst::StdArc>;
   /* Initialize or reset language model */
   virtual LMStatePtr start(bool startWithNothing) = 0;
 
@@ -48,6 +56,20 @@ class LM {
   virtual void updateCache(std::vector<LMStatePtr> stateIdices) {}
 
   virtual ~LM() = default;
+
+  void saveTrie(const std::string & path);
+  void loadTrie(const std::string &path);
+
+  bool hasTrie();
+
+  FstType* getTrie() const;
+
+  protected:
+    void setupTrie(const std::vector<std::string> &vocabulary);
+    // pointer to the dictionary of FST
+    std::unique_ptr<FstType> dictionary;
+    const Tokenizer *tokenizer_;
+    LMUnit unit;
 };
 
 using LMPtr = std::shared_ptr<LM>;

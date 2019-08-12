@@ -125,11 +125,16 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         .def(py::init<>());
 
     py::class_<LM, LMPtr, PyLM>(m, "LM")
-        .def(py::init<>())
+        .def(py::init<const Tokenizer&, LMUnit>())
         .def("start", &LM::start, "start_with_nothing"_a)
         .def("score", &LM::score, "state"_a, "token_index"_a)
         .def("finish", &LM::finish, "state"_a)
-        .def("compare_state", &LM::compareState, "state1"_a, "state2"_a);
+        .def("compare_state", &LM::compareState, "state1"_a, "state2"_a)
+        .def("save_trie", &LM::saveTrie, "path"_a)
+        .def("load_trie", &LM::loadTrie, "path"_a)
+        .def_property_readonly("has_trie", &LM::hasTrie);
+
+
 
     py::class_<Tokenizer>(m, "Tokenizer")
         .def(py::init<>())
@@ -155,10 +160,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 
     py::class_<KenLM, KenLMPtr, LM>(m, "KenLM")
         .def(
-            py::init<const std::string &, const Tokenizer &, LMUnit>(),
+            py::init<const std::string &, const Tokenizer &, const std::string &, LMUnit, bool>(),
             "path"_a,
-            "tokenizer"_a, "unit"_a = LMUnit::Word)
-        .def_readwrite("unit", &KenLM::unit);
+            "tokenizer"_a, "trie_path"_a="", "unit"_a = LMUnit::Word, "build_trie"_a=false);
 
     m.def("beam_decoder_batch", &beam_decoder_batch, "beam_decoder_batch");
 }
