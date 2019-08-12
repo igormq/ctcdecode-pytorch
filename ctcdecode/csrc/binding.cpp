@@ -59,7 +59,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder_batch(co
                                                                         int num_processes,
                                                                         double cutoff_prob,
                                                                         int cutoff_top_n,
-                                                                        LMPtr scorer,
+                                                                        LMPtr &lm,
                                                                         double alpha,
                                                                         double beta)
 {
@@ -84,7 +84,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder_batch(co
         num_processes,
         log(cutoff_prob),
         cutoff_top_n,
-        scorer, alpha, beta);
+        lm, alpha, beta);
 
     at::Tensor output = torch::empty({batch_size, beam_size, max_time}, torch::dtype(torch::kInt32).device(torch::kCPU));
     at::Tensor timesteps = torch::empty({batch_size, beam_size, max_time}, torch::dtype(torch::kInt32).device(torch::kCPU));

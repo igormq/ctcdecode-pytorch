@@ -19,7 +19,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder_batch(co
                                                                         int num_processes,
                                                                         double cutoff_prob,
                                                                         int cutoff_top_n,
-                                                                        LMPtr lm,
+                                                                        LMPtr &lm,
                                                                         double alpha,
                                                                         double beta);
 // int paddle_beam_decode(THFloatTensor *th_probs,

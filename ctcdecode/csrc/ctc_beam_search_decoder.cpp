@@ -16,7 +16,7 @@
 DecoderState *
 decoder_init(int blank_id,
              int class_dim,
-             const LMPtr lm)
+             const LMPtr &lm)
 {
 
   // assign special ids
@@ -55,7 +55,7 @@ void decoder_next(const float *log_probs,
                   double log_cutoff_prob,
                   size_t cutoff_top_n,
                   size_t beam_size,
-                  const LMPtr lm,
+                  const LMPtr &lm,
                   double alpha,
                   double beta)
 {
@@ -127,6 +127,8 @@ void decoder_next(const float *log_probs,
 
         auto lm_out = lm->score(prefix->lmState, prefix_new->character);
 
+        // TODO: equal prefix, different states. What to do?
+
         // int lmCmp = lm_->compareState(prefix_new->lmState, lm_out->first);
 
         // if (lmCmp != 0) {
@@ -153,8 +155,11 @@ void decoder_next(const float *log_probs,
 
         prefix_new->lmState = lm_out.first;
         prefix_new->score_lm = prefix->score_lm;
+
+        // LM returns > 0 if we do not need to update the score
         if (lm_out.second <= 0.0)
           prefix_new->score_lm += lm_out.second * alpha + beta;
+          
       } // end of loop over prefix
     }   // end of loop over vocabulary
 
@@ -181,7 +186,7 @@ void decoder_next(const float *log_probs,
 
 std::vector<Output> decoder_decode(DecoderState *state,
                                    size_t beam_size,
-                                   const LMPtr lm, double alpha, double beta)
+                                   const LMPtr &lm, double alpha, double beta)
 {
   std::vector<PathTrie *> prefixes_copy = state->prefixes;
   std::unordered_map<const PathTrie *, float> scores;
@@ -218,7 +223,7 @@ std::vector<Output> ctc_beam_search_decoder(
     size_t beam_size,
     double log_cutoff_prob,
     size_t cutoff_top_n,
-    const LMPtr lm, double alpha, double beta)
+    const LMPtr &lm, double alpha, double beta)
 {
 
   DecoderState *state = decoder_init(blank_id, class_dim, lm);
@@ -243,7 +248,7 @@ ctc_beam_search_decoder_batch(
     size_t num_processes,
     double log_cutoff_prob,
     size_t cutoff_top_n,
-    const LMPtr lm, double alpha, double beta)
+    const LMPtr &lm, double alpha, double beta)
 {
   VALID_CHECK_GT(num_processes, 0, "num_processes must be nonnegative");
   VALID_CHECK_EQ(batch_size, seq_lengths_size, "must have one sequence length per batch element");
