@@ -5,7 +5,7 @@ import platform
 import sys
 
 from setuptools import setup
-from torch.utils.cpp_extension import BuildExtension, CppExtension
+from torch.utils.cpp_extension import BuildExtension, CppExtension, include_paths
 
 project_version = '0.1'
 
@@ -53,7 +53,7 @@ sources += glob.glob('*.cpp')
 decoder_module = CppExtension(name='_C',
                               sources=sources,
                               language='c++',
-                              include_dirs=include_dirs + ['./'],
+                              include_dirs=include_dirs + ['./'] + include_paths(),
                               extra_compile_args=extra_compile_args,
                               libraries=libraries)
 
