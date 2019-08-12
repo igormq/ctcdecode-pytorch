@@ -12,10 +12,10 @@
 
 #include "LM.h"
 
-#include <lm/enumerate_vocab.hh>
-#include <lm/word_index.hh>
-#include <lm/state.hh>
-#include <util/string_piece.hh>
+#include "lm/enumerate_vocab.hh"
+#include "lm/word_index.hh"
+#include "lm/state.hh"
+#include "util/string_piece.hh"
 
 // KenLM forward declarations
 namespace lm

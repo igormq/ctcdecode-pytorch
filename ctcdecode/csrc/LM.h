@@ -5,8 +5,8 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include <fst/fstlib.h>
 
+#include "fst/fstlib.h"
 #include "Tokenizer.h"
 
 
