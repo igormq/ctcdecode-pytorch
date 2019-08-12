@@ -78,9 +78,6 @@ def ctc_beam_search_decoder(log_probs_seq,
     log_probs_seq = log_probs_seq.float()
     seq_lengths = seq_lengths.int()
 
-    print(log_probs_seq.shape)
-    print(seq_lengths)
-
     beam_result = _C.beam_decoder_batch(log_probs_seq, seq_lengths, blank, beam_size, num_processes, cutoff_prob,
                                         cutoff_top_n, lm, alpha, beta)
 

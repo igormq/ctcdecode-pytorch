@@ -55,8 +55,7 @@ decoder_module = CppExtension(name='_C',
                               language='c++',
                               include_dirs=include_dirs + ['./'],
                               extra_compile_args=extra_compile_args,
-                              libraries=libraries,
-                              extra_link_args=[common_build])
+                              libraries=libraries)
 
 setup(name='ds_ctcdecoder',
       version=project_version,
