@@ -6,7 +6,7 @@ import numpy as np
 
 from ctcdecode.csrc import _C
 from ctcdecode.decoders import ctc_beam_search_decoder
-from ctcdecode.lm import KenLM, KenLMUnit
+from ctcdecode.lm import KenLM, LMUnit
 from ctcdecode.tokenizer import Tokenizer
 
 data_dir = 'tests/data'
@@ -20,7 +20,7 @@ tokenizer.space_index = tokenizer.get_index('<space>')
 
 # lm-based decoding
 scorer = None
-scorer = KenLM(os.path.join(data_dir, 'bigram.arpa'), tokenizer, unit=KenLMUnit.Word)
+scorer = KenLM(os.path.join(data_dir, 'bigram.arpa'), tokenizer, unit=LMUnit.Word, build_trie=True)
 s = time.time()
 
 result = ctc_beam_search_decoder(inputs,
