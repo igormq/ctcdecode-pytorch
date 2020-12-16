@@ -16,20 +16,8 @@
 #include "lm/word_index.hh"
 #include "lm/state.hh"
 #include "util/string_piece.hh"
+#include <lm/model.hh>
 
-// KenLM forward declarations
-namespace lm
-{
-namespace base
-{
-class Model;
-class Vocabulary;
-} // namespace base
-// namespace ngram
-// {
-// class State;
-// } // namespace ngram
-} // namespace lm
 
 // Implement a callback to retrieve the dictionary of language model.
 class RetrieveStrEnumerateVocab : public lm::EnumerateVocab {
@@ -43,14 +31,12 @@ public:
   std::vector<std::string> vocabulary;
 };
 
-struct KenLMState
-{
-  lm::ngram::State state;
-  // WordIndex words[KENLM_MAX_ORDER - 1];
-  //   float backoff[KENLM_MAX_ORDER - 1];
-  //   unsigned char length;
-  // typedef unsigned int WordIndex;
+struct KenLMState : LMState {
+  lm::ngram::State ken_state_;
   std::vector<int> tokens;
+  lm::ngram::State* ken_state() {
+    return &ken_state_;
+  }
 };
 
 /**
@@ -69,14 +55,10 @@ public:
 
   std::pair<LMStatePtr, float> finish(const LMStatePtr &state) override;
 
-  int compareState(const LMStatePtr &state1, const LMStatePtr &state2)
-      const override;
-
 private:
   std::shared_ptr<lm::base::Model> model_;
   const lm::base::Vocabulary *vocab_;
 
-  static KenLMState *getRawState(const LMStatePtr &state);
 };
 
 using KenLMPtr = std::shared_ptr<KenLM>;

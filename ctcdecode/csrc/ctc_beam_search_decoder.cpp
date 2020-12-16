@@ -126,7 +126,7 @@ void decoder_next(const float *log_probs,
 
         // TODO: equal prefix, different states. What to do?
 
-        // int lmCmp = lm_->compareState(prefix_new->lmState, lm_out->first);
+        // int lmCmp = lm_->compare(prefix_new->lmState, lm_out->first);
 
         // if (lmCmp != 0) {
         //   // diff state

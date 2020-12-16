@@ -5,19 +5,13 @@
 using namespace pybind11::literals;
 
 /**
- * Some hackery that lets pybind11 handle shared_ptr<void> (for LMStatePtr).
- * See: https://github.com/pybind/pybind11/issues/820
- */
-PYBIND11_MAKE_OPAQUE(std::shared_ptr<void>);
-
-/**
  * A pybind11 "alias type" for abstract class LM, allowing one to subclass LM
  * with a custom LM defined purely in Python. For those who don't want to build
  * with KenLM, or have their own custom LM implementation.
  * See: https://pybind11.readthedocs.io/en/stable/advanced/classes.html
  *
  * Currently this works in principle, but is very slow due to
- * decoder calling `compareState` a huge number of times.
+ * decoder calling `compare` a huge number of times.
  *
  * TODO: ensure this works. Last time I tried this there were slicing issues,
  * see https://github.com/pybind/pybind11/issues/1546 for workarounds.
@@ -45,23 +39,23 @@ class PyLM : public LM
         PYBIND11_OVERLOAD_PURE(LMOutput, LM, finish, state);
     }
 
-    int compareState(const LMStatePtr &state1, const LMStatePtr &state2)
+    int compare(const LMStatePtr &state1, const LMStatePtr &state2)
         const override
     {
-        PYBIND11_OVERLOAD_PURE(int, LM, compareState, state1, state2);
+        PYBIND11_OVERLOAD_PURE(int, LM, compare, state1, state2);
     }
 };
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder_batch(const at::Tensor log_probs,
-                                                                        const at::Tensor seq_lengths,
-                                                                        int blank_id,
-                                                                        int beam_size,
-                                                                        int num_processes,
-                                                                        double cutoff_prob,
-                                                                        int cutoff_top_n,
-                                                                        LMPtr &lm,
-                                                                        double alpha,
-                                                                        double beta)
+                                                                              const at::Tensor seq_lengths,
+                                                                              int blank_id,
+                                                                              int beam_size,
+                                                                              int num_processes,
+                                                                              double cutoff_prob,
+                                                                              int cutoff_top_n,
+                                                                              LMPtr &lm,
+                                                                              double alpha,
+                                                                              double beta)
 {
     AT_ASSERT(log_probs.is_contiguous());
     AT_ASSERT(seq_lengths.is_contiguous());
@@ -103,7 +97,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> beam_decoder_batch(co
         for (int p = 0; p < results.size(); ++p)
         {
             Output out = results[p];
-            
+
             auto output_tokens = out.tokens;
             auto output_timesteps = out.timesteps;
             for (int t = 0; t < output_tokens.size(); ++t)
@@ -123,18 +117,19 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 
     py::class_<LMStatePtr>(m, "LMState")
         .def(py::init<>());
+        .def_readwrite("children", &LMState::children)
+        .def("compare", &LMState::compare, "state"_a)
+        .def("child", &LMState::child<LMState>, "usr_index"_a);
 
     py::class_<LM, LMPtr, PyLM>(m, "LM")
-        .def(py::init<const Tokenizer&, LMUnit>())
+        .def(py::init<const Tokenizer &, LMUnit>())
         .def("start", &LM::start, "start_with_nothing"_a)
         .def("score", &LM::score, "state"_a, "token_index"_a)
         .def("finish", &LM::finish, "state"_a)
-        .def("compare_state", &LM::compareState, "state1"_a, "state2"_a)
+        .def("compare_state", &LM::compare, "state1"_a, "state2"_a)
         .def("save_trie", &LM::saveTrie, "path"_a)
         .def("load_trie", &LM::loadTrie, "path"_a)
         .def_property_readonly("has_trie", &LM::hasTrie);
-
-
 
     py::class_<Tokenizer>(m, "Tokenizer")
         .def(py::init<>())
@@ -162,7 +157,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         .def(
             py::init<const std::string &, const Tokenizer &, const std::string &, LMUnit, bool>(),
             "path"_a,
-            "tokenizer"_a, "trie_path"_a="", "unit"_a = LMUnit::Word, "build_trie"_a=false);
+            "tokenizer"_a, "trie_path"_a = "", "unit"_a = LMUnit::Word, "build_trie"_a = false);
 
     m.def("beam_decoder_batch", &beam_decoder_batch, "beam_decoder_batch");
 }

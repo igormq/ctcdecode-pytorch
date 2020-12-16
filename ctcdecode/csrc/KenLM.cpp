@@ -50,11 +50,11 @@ LMStatePtr KenLM::start(bool startWithNothing)
 
   if (startWithNothing)
   {
-    model_->NullContextWrite(&outState->state);
+    model_->NullContextWrite(outState->ken_state());
   }
   else
   {
-    model_->BeginSentenceWrite(&outState->state);
+    model_->BeginSentenceWrite(outState->ken_state());
   }
 
   return outState;
@@ -66,8 +66,8 @@ std::pair<LMStatePtr, float> KenLM::score(
 {
   std::string entry = "";
   float score;
-  auto inState = getRawState(state);
-  auto outState = std::make_shared<KenLMState>();
+  auto inState = std::static_pointer_cast<KenLMState>(state);
+  auto outState = inState->child<KenLMState>(token_index);
 
   if ( unit == LMUnit::Word && token_index != tokenizer_->getSpaceIndex())
   {
@@ -97,7 +97,7 @@ std::pair<LMStatePtr, float> KenLM::score(
   {
     // Some bug here
     score =
-      model_->BaseScore(&inState->state, lm_token_index, &outState->state) / NUM_FLT_LOGE;
+      model_->BaseScore(inState->ken_state(), lm_token_index, outState->ken_state()) / NUM_FLT_LOGE;
   }
 
   return std::make_pair(std::move(outState), score);
@@ -105,36 +105,19 @@ std::pair<LMStatePtr, float> KenLM::score(
 
 std::pair<LMStatePtr, float> KenLM::finish(const LMStatePtr &state)
 {
-  auto inState = getRawState(state);
-  auto outState = std::make_shared<KenLMState>();
+  auto inState = std::static_pointer_cast<KenLMState>(state);
+  auto outState = inState->child<KenLMState>(-1);
   float score = 0.0;
 
   if (unit == LMUnit::Word && inState->tokens.size() > 0)
   {
     auto output = KenLM::score(state, tokenizer_->getSpaceIndex());
-    inState = getRawState(output.first);
+    inState = std::static_pointer_cast<KenLMState>(output.first);
     score += output.second;
   }
 
   score +=
-      model_->BaseScore(&inState->state, vocab_->EndSentence(), &outState->state);
+      model_->BaseScore(inState->ken_state(), vocab_->EndSentence(), outState->ken_state());
 
   return std::make_pair(std::move(outState), score / NUM_FLT_LOGE);
-}
-
-int KenLM::compareState(const LMStatePtr &state1, const LMStatePtr &state2)
-    const
-{
-  auto inState1 = getRawState(state1);
-  auto inState2 = getRawState(state2);
-  if (inState1->state == inState2->state)
-  {
-    return 0;
-  }
-  return inState1->state.Compare(inState2->state);
-}
-
-KenLMState *KenLM::getRawState(const LMStatePtr &state)
-{
-  return static_cast<KenLMState *>(state.get());
 }
